@@ -1,0 +1,8 @@
+/data
+/FINAL MODEL
+/global
+/models
+/programms
+/tensorboard
+__pycache__
+*.db
