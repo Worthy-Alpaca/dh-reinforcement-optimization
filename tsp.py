@@ -62,9 +62,7 @@ from src.misc.dataloader import DataLoader
 import random
 
 # coords, W_np = get_graph_mat(n=20)
-path = Path(
-    r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\data"
-)
+path = Path(os.getcwd() + os.path.normpath("/data"))
 
 products = {}
 for i in os.listdir(path):

@@ -39,9 +39,7 @@ def plot_graph(coords, mat):
 
 model = DeployModel(Path(os.getcwd() + os.path.normpath("/FINAL MODEL")))
 
-path = Path(
-    r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\programms"
-)
+path = Path(os.getcwd() + os.path.normpath("/programms"))
 products = deque()
 test = float("inf")
 
