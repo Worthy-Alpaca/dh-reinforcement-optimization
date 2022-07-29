@@ -36,13 +36,21 @@ class QFunction:
                 len(solution) == 0 or W[solution[-1], idx] > 0
             ) and idx not in already_in:
                 return idx, estimated_rewards[idx].item()
-        print("here")
-        return None, 0
+        print("here get best action")
+        return 0, 0
 
     def batch_update(self, states_tsrs, Ws, actions, targets):
         Ws_tsr = torch.stack(Ws).to(self.device)
         xv = torch.stack(states_tsrs).to(self.device)
         self.optimizer.zero_grad()
+
+        if None in actions:
+            for i in actions:
+                for x in range(len(actions)):
+                    if x in actions:
+                        continue
+                    else:
+                        actions[i] = x
 
         estimated_rewards = self.model(xv, Ws_tsr)[range(len(actions)), actions]
 
@@ -87,24 +95,27 @@ class UtilFunctions:
     def is_state_final(self, state):
         return len(set(state.partial_solution)) == state.W.shape[0]
 
-    def total_distance(self, solution, W):
+    def total_distance(self, solution: list, W):
         if len(solution) < 2:
-            return 0
+            return 0, solution
 
-        total_dist = 0
-
-        def compare(p1, p2):
-            l2 = len(list(set(p1) & set(p2)))
-            l1 = len(p1)
-            return l2 / l1
+        total_dist = 0.0
 
         for i in range(len(solution) - 1):
-            l2 = len(
-                list(
-                    set(self.coords[solution[i], 3])
-                    & set(self.coords[solution[i + 1], 3])
-                )
-            )
+            # print(
+            #     type(self.coords[solution[i], 3]), type(self.coords[solution[i + 1], 3])
+            # )
+            # this is a PROBLEM
+            idx1, idx2 = solution[i], solution[i + 1]
+            if idx2 == None:
+                for x in range(W.shape[0]):
+                    if x in solution:
+                        continue
+                    else:
+                        idx2 = x
+                        solution[i + 1] = x
+
+            l2 = len(list(set(self.coords[idx1, 3]) & set(self.coords[idx2, 3])))
             l1 = len(self.coords[solution[i], 3])
             total_dist += l2 / l1
 
@@ -117,7 +128,7 @@ class UtilFunctions:
         if len(solution) == W.shape[0]:
             total_dist += W[solution[-1], solution[0]].item()"""
 
-        return total_dist
+        return total_dist, solution
 
     def get_next_neighbor_random(self, state):
         # replace this with overlap calculations
