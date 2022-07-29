@@ -87,11 +87,13 @@ class RunModel:
                 allComponents.append(components["index"].unique())
 
             self.products[product] = {
-                "len": overallLen,
-                "time": overallTime,
+                "len": np.log10(overallLen),
+                "time": np.log10(overallTime),
                 "comps": list(itertools.chain.from_iterable(allComponents)),
             }
         print("Data generation done")
+        if numSamples == -1:
+            self.numSamples = len(self.products.keys())
 
     def init_model(
         self,
@@ -109,13 +111,13 @@ class RunModel:
         )
 
         # self.writer = SummaryWriter(os.getcwd() + os.path.normpath(f"/tensorboard/"))
-        coords, W_np, _ = self.getData()
-        W = torch.tensor(
-            W_np, dtype=torch.float32, requires_grad=False, device=self.device
-        )
-        solution = [random.randint(0, coords.shape[0] - 1)]
-        current_state = self.State(partial_solution=solution, W=W, coords=coords)
-        current_state_tsr = self.state2tens(current_state)
+        # coords, W_np, _ = self.getData()
+        # W = torch.tensor(
+        #     W_np, dtype=torch.float32, requires_grad=False, device=self.device
+        # )
+        # solution = [random.randint(0, coords.shape[0] - 1)]
+        # current_state = self.State(partial_solution=solution, W=W, coords=coords)
+        # current_state_tsr = self.state2tens(current_state)
         # summary(Q_net, coords.shape)
         # self.writer.add_graph(Q_net)
         if fname is not None:
@@ -177,6 +179,8 @@ class RunModel:
             lw=2,
             alpha=0.8,
         )
+        plt.xlabel("Number of placements")
+        plt.ylabel("Simulated Time")
         plt.plot(coords[solution[0], 0], coords[solution[0], 1], "x", markersize=10)
 
     def state2tens(self, state):
@@ -205,7 +209,10 @@ class RunModel:
             xv, dtype=torch.float32, requires_grad=False, device=self.device
         )
 
-    def getData(self, key=False):
+    def getRandomSample(self, size):
+        return random.sample(list(self.products.keys()), size)
+
+    def getData(self, key=False, samples=False):
         def compare(p1, p2):
             l2 = len(list(set(p1) & set(p2)))
             l1 = len(p1)
@@ -249,7 +256,10 @@ class RunModel:
             }"""
 
         globalList = {}
-        sampleSize = random.sample(list(self.products.keys()), self.numSamples)
+        if samples:
+            sampleSize = samples
+        else:
+            sampleSize = random.sample(list(self.products.keys()), self.numSamples)
         for i in sampleSize:
             currentList = set(sampleSize.copy())
             currentList.remove(i)
@@ -317,7 +327,7 @@ class RunModel:
             # sample a new random graph
             coords, W_np, product = self.getData()
             self.helper = UtilFunctions(coords)
-            # coords, W_np = self.get_graph_mat(len(os.listdir("./data")))
+            # coords, W_np = self.get_graph_mat(self.numSamples)
             W = torch.tensor(
                 W_np, dtype=torch.float32, requires_grad=False, device=self.device
             )
@@ -379,10 +389,9 @@ class RunModel:
                     print("here")
 
                 # reward observed for taking this step
-                reward = -(
-                    self.helper.total_distance(next_solution, W)
-                    - self.helper.total_distance(solution, W)
-                )
+                rwNext, next_solution = self.helper.total_distance(next_solution, W)
+                rwNow, solution = self.helper.total_distance(solution, W)
+                reward = -(rwNext - rwNow)
 
                 next_state = self.State(
                     partial_solution=next_solution,
@@ -462,7 +471,7 @@ class RunModel:
                             Q_net, optimizer, lr_scheduler, loss, episode, med_length
                         )
 
-            length = self.helper.total_distance(solution, W)
+            length, solution = self.helper.total_distance(solution, W)
             path_lengths.append(length)
 
             if episode % 10 == 0:
@@ -483,7 +492,7 @@ class RunModel:
                     [n for n in solution],
                 )
 
-    def getBestOder(self, plot=False):
+    def getBestOder(self, samples, plot=False):
         all_lengths_fnames = [
             f for f in os.listdir(self.folder_name) if f.endswith(".tar")
         ]
@@ -504,9 +513,8 @@ class RunModel:
         best_solution = {}
         best_value = float("inf")
 
-        for key in self.products.keys():
-            #
-            coords, W_np, _ = self.getData(key)
+        for i in samples:
+            coords, W_np, _ = self.getData(key=i, samples=samples)
             self.helper = UtilFunctions(coords)
             # plot_graph(coords, 1)
             # plt.show()
@@ -532,8 +540,8 @@ class RunModel:
                 )
                 current_state_tsr = self.state2tens(current_state)
 
-            if self.helper.total_distance(solution, W) < best_value:
-                best_value = self.helper.total_distance(solution, W)
+            if self.helper.total_distance(solution, W)[0] < best_value:
+                best_value, solution = self.helper.total_distance(solution, W)
                 best_solution = {"W": W, "solution": solution, "coords": coords}
 
         if plot:
@@ -542,7 +550,7 @@ class RunModel:
                 "The best value for this iteration is: ",
                 self.helper.total_distance(
                     best_solution["solution"], best_solution["W"]
-                ),
+                )[0],
             )
             print(best_solution["coords"][:, :2].astype(np.float32))
             self.plot_solution(
@@ -554,7 +562,7 @@ class RunModel:
                 "model / len = {}".format(
                     self.helper.total_distance(
                         best_solution["solution"], best_solution["W"]
-                    )
+                    )[0]
                 )
             )
             plt.figure()
@@ -566,12 +574,12 @@ class RunModel:
             )
             plt.title(
                 "random / len = {}".format(
-                    self.helper.total_distance(random_solution, best_solution["W"])
+                    self.helper.total_distance(random_solution, best_solution["W"])[0]
                 )
             )
 
             for x in best_solution["solution"]:
-                print(best_solution["coords"][x][:2])
+                print(best_solution["coords"][x][:3])
             plt.show()
         return best_value, best_solution
 
@@ -593,10 +601,16 @@ class RunModel:
 
 
 if __name__ == "__main__":
+    random.seed(1000)
+    np.random.seed(1000)
+    torch.manual_seed(1000)
     START_TIME = time.perf_counter()
-    runmodel = RunModel(numSamples=20)
-    # coords, w_np, product = runmodel.getData()
-    # runmodel.plot_graph(coords)
+    runmodel = RunModel(numSamples=-1)
+    coords, w_np, product = runmodel.getData()
+
+    # print(coords[:, :2], coords.shape)
+    # coords, _ = runmodel.get_graph_mat(20)
+    # print(coords, coords.shape)
     # exit()
     Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
         EMBEDDING_DIMENSIONS=10, EMBEDDING_ITERATIONS_T=4
@@ -606,4 +620,5 @@ if __name__ == "__main__":
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     for i in range(5):
-        runmodel.getBestOder(plot=True)
+        samples = runmodel.getRandomSample(8)
+        runmodel.getBestOder(samples=samples, plot=True)
