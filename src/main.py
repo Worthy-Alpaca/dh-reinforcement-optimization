@@ -18,7 +18,7 @@ from sqlalchemy import create_engine
 from torchinfo import summary
 import time
 from tqdm import tqdm
-
+from datetime import datetime
 from misc.deploy import DeployModel
 
 """PACKAGE_PARENT = "../"
@@ -26,7 +26,7 @@ SCRIPT_DIR = os.path.dirname(
     os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__)))
 )
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))"""
-from helper import Memory, UtilFunctions
+from helper import Memory, UtilFunctions, Cartsetup, Coating
 
 from misc.dataloader import DataLoader, DataBaseLoader
 
@@ -82,14 +82,17 @@ class RunModel:
                     [len(data) * len(offsets), 0 if m == "m10" else 1, Xmax, Ymax]
                 )
                 overallTime += self.model.predict(predArray).item()
+                overallTime += Coating(Ymax)
                 overallLen += len(data) * len(offsets)
 
                 allComponents.append(components["index"].unique())
 
             self.products[product] = {
-                "len": np.log10(overallLen),
-                "time": np.log10(overallTime),
-                "comps": list(itertools.chain.from_iterable(allComponents)),
+                "len": overallLen,
+                "time": overallTime,
+                "comps": list(
+                    dict.fromkeys(list(itertools.chain.from_iterable(allComponents)))
+                ),
             }
         print("Data generation done")
         if numSamples == -1:
@@ -109,17 +112,26 @@ class RunModel:
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, gamma=LR_DECAY_RATE
         )
+        timestamp = datetime.now().strftime("%m-%d-%Y_%H_%M_%S")
+        self.run_name = (
+            f"{OPTIMIZER.__class__.__name__}_{EMBEDDING_DIMENSIONS}@{timestamp}"
+        )
+        self.writer = SummaryWriter(
+            os.getcwd() + os.path.normpath(f"/tensorboard/{self.run_name}")
+        )
+        coords, W_np, _ = self.getData()
+        W = torch.tensor(
+            W_np, dtype=torch.float32, requires_grad=False, device=self.device
+        )
+        solution = [random.randint(0, coords.shape[0] - 1)]
+        current_state = self.State(
+            partial_solution=solution, W=W, coords=coords[:, :2].astype(np.float32)
+        )
+        current_state_tsr = self.state2tens(current_state)
 
-        # self.writer = SummaryWriter(os.getcwd() + os.path.normpath(f"/tensorboard/"))
-        # coords, W_np, _ = self.getData()
-        # W = torch.tensor(
-        #     W_np, dtype=torch.float32, requires_grad=False, device=self.device
-        # )
-        # solution = [random.randint(0, coords.shape[0] - 1)]
-        # current_state = self.State(partial_solution=solution, W=W, coords=coords)
-        # current_state_tsr = self.state2tens(current_state)
-        # summary(Q_net, coords.shape)
-        # self.writer.add_graph(Q_net)
+        # summary(Q_net, (xv.shape, Ws_tsr.shape))
+        # with torch.no_grad():
+        #     self.writer.add_graph(Q_net, None)
         if fname is not None:
             checkpoint = torch.load(fname)
             Q_net.load_state_dict(checkpoint["model"])
@@ -158,7 +170,17 @@ class RunModel:
         )
 
     def plot_solution(self, coords, mat, solution):
+
+        labels = coords[:, 2:3]
+        labels = labels[:, 0]
+
+        coords = coords[:, :2].astype(np.float32)
+
         plt.scatter(coords[:, 0], coords[:, 1])
+
+        for i, label in enumerate(labels):
+            plt.annotate(label, (coords[:, 0][i], coords[:, 1][i]))
+
         n = len(coords)
 
         for idx in range(n - 1):
@@ -180,7 +202,7 @@ class RunModel:
             alpha=0.8,
         )
         plt.xlabel("Number of placements")
-        plt.ylabel("Simulated Time")
+        plt.ylabel("Number of Components")
         plt.plot(coords[solution[0], 0], coords[solution[0], 1], "x", markersize=10)
 
     def state2tens(self, state):
@@ -218,43 +240,6 @@ class RunModel:
             l1 = len(p1)
             return l2 / l1
 
-        """engine = create_engine("sqlite:///products.db")
-        dbData = engine.execute("SELECT * FROM 'products'").fetchall()
-        prodData = []
-        for i in dbData:
-            prodData.append(i[1])
-
-        prodData = random.sample(prodData, self.numSamples)
-
-        for i in prodData:
-            product = i
-            overallLen = 0
-            overallTime = 0
-            allComponents = []
-            for m in ["m10", "m20"]:
-
-                dataloader = DataBaseLoader(engine, i, m)
-                data, components, offsets = dataloader()
-                if len(data) == 0:
-                    Ymax = 0
-                    Xmax = 0
-                else:
-                    Ymax = data["Y"].max() + max(offsets[1])
-                    Xmax = data["X"].max() + max(offsets[0])
-                predArray = np.array(
-                    [len(data) * len(offsets), 0 if m == "m10" else 1, Xmax, Ymax]
-                )
-                overallTime += self.model.predict(predArray).item()
-                overallLen += len(data) * len(offsets)
-
-                allComponents.append(components["index"].unique())
-
-            self.products[product] = {
-                "len": overallLen,
-                "time": overallTime,
-                "comps": list(itertools.chain.from_iterable(allComponents)),
-            }"""
-
         globalList = {}
         if samples:
             sampleSize = samples
@@ -267,18 +252,22 @@ class RunModel:
             currentDict = [
                 [
                     self.products[i]["len"],
-                    self.products[i]["time"],
+                    len(self.products[i]["comps"]),
                     i,
                     self.products[i]["comps"],
+                    self.products[i]["time"],
+                    random.randint(1, 50),
                 ]
             ]
             for j in currentList:
                 currentDict.append(
                     [
                         self.products[j]["len"],
-                        self.products[j]["time"],
+                        len(self.products[j]["comps"]),
                         j,
                         self.products[j]["comps"],
+                        self.products[j]["time"],
+                        random.randint(1, 50),
                     ]
                 )
             globalList[i] = currentDict
@@ -296,7 +285,36 @@ class RunModel:
         W_np = distance_matrix(
             coords[:, :2].astype(np.float32), coords[:, :2].astype(np.float32)
         )
+        W_np = self.distance_matrix(coords)
         return coords, W_np, product
+
+    def distance_matrix(self, coords: np.ndarray):
+        nextItems = coords.copy()
+        global_matrix = []
+        for i in range(len(coords)):
+            running_matrix = []
+            numPlacements = coords[i][0]
+            numComps = coords[i][1]
+            components = coords[i][3]
+            assemblyTime = coords[i][4]
+            setupTime = Cartsetup(components)
+            for j in range(len(coords)):
+                numPlacementsNext = coords[j][0]
+                numCompsNext = coords[j][1]
+                componentsNext = coords[j][3]
+                assemblyTimeNext = coords[j][4]
+                setupTimeNext = Cartsetup(componentsNext)
+
+                overlap = list(set(components) & set(componentsNext))
+                overlapTime = Cartsetup(overlap)
+                timeDifference = (
+                    setupTimeNext - overlapTime + assemblyTime - assemblyTimeNext
+                )
+                running_matrix.append(timeDifference)
+
+            global_matrix.append(running_matrix)
+
+        return np.asarray(global_matrix)
 
     def get_graph_mat(self, n=10, size=1):
         """Throws n nodes uniformly at random on a square, and build a (fully connected) graph.
@@ -554,12 +572,12 @@ class RunModel:
             )
             print(best_solution["coords"][:, :2].astype(np.float32))
             self.plot_solution(
-                best_solution["coords"][:, :2].astype(np.float32),
+                best_solution["coords"],
                 best_solution["W"],
                 best_solution["solution"],
             )
             plt.title(
-                "model / len = {}".format(
+                "model / time = {}".format(
                     self.helper.total_distance(
                         best_solution["solution"], best_solution["W"]
                     )[0]
@@ -568,12 +586,12 @@ class RunModel:
             plt.figure()
             random_solution = list(range(best_solution["coords"].shape[0]))
             self.plot_solution(
-                best_solution["coords"][:, :2].astype(np.float32),
+                best_solution["coords"],
                 best_solution["W"],
                 random_solution,
             )
             plt.title(
-                "random / len = {}".format(
+                "random / time = {}".format(
                     self.helper.total_distance(random_solution, best_solution["W"])[0]
                 )
             )
@@ -605,8 +623,8 @@ if __name__ == "__main__":
     np.random.seed(1000)
     torch.manual_seed(1000)
     START_TIME = time.perf_counter()
-    runmodel = RunModel(numSamples=-1)
-    coords, w_np, product = runmodel.getData()
+    runmodel = RunModel(numSamples=15)
+    # coords, w_np, product = runmodel.getData()
 
     # print(coords[:, :2], coords.shape)
     # coords, _ = runmodel.get_graph_mat(20)
@@ -616,7 +634,7 @@ if __name__ == "__main__":
         EMBEDDING_DIMENSIONS=10, EMBEDDING_ITERATIONS_T=4
     )
 
-    runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 3001, 0.7, 6e-4, 4, 16, 0.7)
+    runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 1001, 0.7, 6e-4, 4, 16, 0.7)
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     for i in range(5):
