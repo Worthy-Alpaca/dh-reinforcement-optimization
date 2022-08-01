@@ -189,7 +189,7 @@ class DataBaseLoader:
             self.offsets = offsetList
 
     def __call__(self):
-        return (self.data, self.components, self.offsets)
+        return (self.data, self.components.drop_duplicates(), self.offsets)
 
 
 if __name__ == "__main__":
