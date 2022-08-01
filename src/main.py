@@ -297,13 +297,17 @@ class RunModel:
             numComps = coords[i][1]
             components = coords[i][3]
             assemblyTime = coords[i][4]
+            productRequirement = coords[i][5]
             setupTime = Cartsetup(components)
+            assemblyTime = assemblyTime * productRequirement
             for j in range(len(coords)):
                 numPlacementsNext = coords[j][0]
                 numCompsNext = coords[j][1]
                 componentsNext = coords[j][3]
                 assemblyTimeNext = coords[j][4]
+                productRequirementNext = coords[j][5]
                 setupTimeNext = Cartsetup(componentsNext)
+                assemblyTimeNext = assemblyTimeNext * productRequirementNext
 
                 overlap = list(set(components) & set(componentsNext))
                 overlapTime = Cartsetup(overlap)
