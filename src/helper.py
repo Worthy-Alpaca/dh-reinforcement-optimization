@@ -1,5 +1,6 @@
 import random
 import torch
+import math
 import torch.nn as nn
 
 
@@ -101,7 +102,7 @@ class UtilFunctions:
 
         total_dist = 0.0
 
-        for i in range(len(solution) - 1):
+        """for i in range(len(solution) - 1):
             # print(
             #     type(self.coords[solution[i], 3]), type(self.coords[solution[i + 1], 3])
             # )
@@ -117,16 +118,23 @@ class UtilFunctions:
 
             l2 = len(list(set(self.coords[idx1, 3]) & set(self.coords[idx2, 3])))
             l1 = len(self.coords[solution[i], 3])
-            total_dist += l2 / l1
+            total_dist += l2 / l1"""
 
-        """for i in range(len(solution) - 1):
-            if solution[i] == None or solution[i + 1] == None:
-                continue
-            x = W[solution[i], solution[i + 1]]
-            total_dist += W[solution[i], solution[i + 1]].item()
+        for i in range(len(solution) - 1):
+            idx1, idx2 = solution[i], solution[i + 1]
+            if idx2 == None:
+                for x in range(W.shape[0]):
+                    if x in solution:
+                        continue
+                    else:
+                        idx2 = x
+                        solution[i + 1] = x
+            x = W[idx1, idx2]
+            total_dist += W[idx1, idx2].item()
+            total_dist += 1200
 
         if len(solution) == W.shape[0]:
-            total_dist += W[solution[-1], solution[0]].item()"""
+            total_dist += W[solution[-1], solution[0]].item()
 
         return total_dist, solution
 
@@ -138,9 +146,31 @@ class UtilFunctions:
             return random.choice(range(W.shape[0]))
         already_in = set(solution)
         candidates = list(
-            filter(lambda n: n.item() not in already_in, W[solution[-1]].nonzero())
+            filter(lambda n: n.item() not in already_in, W[solution[-1] - 1].nonzero())
         )
 
         if len(candidates) == 0:
             return random.choice(range(W.shape[0]))
         return random.choice(candidates).item()
+
+
+def Cartsetup(comps: list):
+    time = 0
+
+    # print(f"Setting up Cart {cart} with {len(self.feedcart[key])} components")
+    complexity = len(comps) / 36
+    for i in range(len(comps)):
+        time = (60 + random.randint(0, 0) * complexity + 9.8) + time
+    return time
+
+
+def Coating(Ymax) -> float:
+    """simulates the time for coating a PCB
+
+    Returns:
+        float: The calculated time.
+    """
+    velocity = 20  # mm/s
+
+    # highest coordinate on PCB
+    return math.sqrt(0**2 + Ymax**2) / velocity
