@@ -15,7 +15,7 @@ class QNetModel(nn.Module):
 
         self.device = device
 
-        nr_extra_layers_1 = 4
+        nr_extra_layers_1 = T
 
         self.theta1 = nn.Linear(self.node_dim, self.emb_dim, True)
         self.theta2 = nn.Linear(self.emb_dim, self.emb_dim, True)
