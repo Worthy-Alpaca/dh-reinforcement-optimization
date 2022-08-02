@@ -33,11 +33,12 @@ class QFunction:
         already_in = set(solution)
         sorted_reward_idx_list = sorted_reward_idx.tolist()
         for idx in sorted_reward_idx_list:
+            x = W[solution[-1], idx]
             if (
                 len(solution) == 0 or W[solution[-1], idx] > 0
             ) and idx not in already_in:
                 return idx, estimated_rewards[idx].item()
-        print("here get best action")
+        # print("here get best action")
         return 0, 0
 
     def batch_update(self, states_tsrs, Ws, actions, targets):
