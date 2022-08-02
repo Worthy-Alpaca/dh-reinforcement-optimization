@@ -299,7 +299,7 @@ class RunModel:
             assemblyTime = coords[i][4]
             productRequirement = coords[i][5]
             setupTime = Cartsetup(components)
-            assemblyTime = assemblyTime * productRequirement
+            # assemblyTime = assemblyTime * productRequirement
             for j in range(len(coords)):
                 numPlacementsNext = coords[j][0]
                 numCompsNext = coords[j][1]
@@ -307,7 +307,7 @@ class RunModel:
                 assemblyTimeNext = coords[j][4]
                 productRequirementNext = coords[j][5]
                 setupTimeNext = Cartsetup(componentsNext)
-                assemblyTimeNext = assemblyTimeNext * productRequirementNext
+                # assemblyTimeNext = assemblyTimeNext * productRequirementNext
 
                 overlap = list(set(components) & set(componentsNext))
                 overlapTime = Cartsetup(overlap)
@@ -514,7 +514,13 @@ class RunModel:
                     [n for n in solution],
                 )
 
-    def getBestOder(self, samples, plot=False):
+    def getBestOder(
+        self,
+        samples,
+        plot=False,
+        EMBEDDING_DIMENSIONS=20,
+        EMBEDDING_ITERATIONS_T=8,
+    ):
         all_lengths_fnames = [
             f for f in os.listdir(self.folder_name) if f.endswith(".tar")
         ]
@@ -530,7 +536,9 @@ class RunModel:
         """ Load checkpoint
         """
         Q_func, Q_net, optimizer, lr_scheduler = self.init_model(
-            os.path.join(self.folder_name, shortest_fname)
+            os.path.join(self.folder_name, shortest_fname),
+            EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
+            EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
         )
         best_solution = {}
         best_value = float("inf")
@@ -627,20 +635,28 @@ if __name__ == "__main__":
     np.random.seed(1000)
     torch.manual_seed(1000)
     START_TIME = time.perf_counter()
-    runmodel = RunModel(numSamples=15)
-    # coords, w_np, product = runmodel.getData()
-
+    EMBEDDING_DIMENSIONS = 40
+    EMBEDDING_ITERATIONS_T = 8
+    runmodel = RunModel(numSamples=-1)
+    coords, w_np, product = runmodel.getData()
+    runmodel.plot_graph(coords)
     # print(coords[:, :2], coords.shape)
     # coords, _ = runmodel.get_graph_mat(20)
     # print(coords, coords.shape)
     # exit()
     Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
-        EMBEDDING_DIMENSIONS=10, EMBEDDING_ITERATIONS_T=4
+        EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
+        EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
     )
 
-    runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 1001, 0.7, 6e-4, 4, 16, 0.7)
+    # runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     for i in range(5):
-        samples = runmodel.getRandomSample(8)
-        runmodel.getBestOder(samples=samples, plot=True)
+        samples = runmodel.getRandomSample(15)
+        runmodel.getBestOder(
+            samples=samples,
+            plot=True,
+            EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
+            EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
+        )
