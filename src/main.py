@@ -533,6 +533,21 @@ class RunModel:
                     [n for n in solution],
                 )
 
+    def plotMetrics(self):
+        def _moving_avg(x, N=10):
+            return np.convolve(np.array(x), np.ones((N,)) / N, mode="valid")
+
+        plt.figure(figsize=(8, 5))
+        plt.semilogy(_moving_avg(self.losses, 100))
+        plt.ylabel("loss")
+        plt.xlabel("training iteration")
+
+        plt.figure(figsize=(8, 5))
+        plt.plot(_moving_avg(self.path_lengths, 100))
+        plt.ylabel("average length")
+        plt.xlabel("episode")
+        plt.show()
+
     def getBestOder(
         self,
         samples,
