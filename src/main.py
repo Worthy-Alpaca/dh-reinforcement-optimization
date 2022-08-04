@@ -630,7 +630,7 @@ class RunModel:
                 best_solution["solution"],
             )
             plt.title(
-                "model / time = {}".format(
+                "model / runtime = {}s".format(
                     self.helper.total_distance(
                         best_solution["solution"], best_solution["W"]
                     )[0]
@@ -644,7 +644,7 @@ class RunModel:
                 random_solution,
             )
             plt.title(
-                "random / time = {}".format(
+                "random / runtime = {}s".format(
                     self.helper.total_distance(random_solution, best_solution["W"])[0]
                 )
             )
@@ -690,7 +690,7 @@ if __name__ == "__main__":
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
     )
 
-    runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 501, 0.7, 6e-4, 4, 16, 0.7)
+    runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
     # runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
