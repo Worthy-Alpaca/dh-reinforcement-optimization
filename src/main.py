@@ -130,11 +130,12 @@ class RunModel:
         current_state = self.State(
             partial_solution=solution, W=W, coords=coords[:, :2].astype(np.float32)
         )
-        current_state_tsr = self.state2tens(current_state)
+        state_tsr = self.state2tens(current_state)
 
-        # summary(Q_net, (xv.shape, Ws_tsr.shape))
+        summary(Q_net, (state_tsr.unsqueeze(0).shape, W.unsqueeze(0).shape))
         # with torch.no_grad():
-        #     self.writer.add_graph(Q_net, None)
+        #     self.writer.add_graph(Q_net, (state_tsr.unsqueeze(0), W.unsqueeze(0)))
+
         if fname is not None:
             checkpoint = torch.load(fname)
             Q_net.load_state_dict(checkpoint["model"])
@@ -689,7 +690,7 @@ if __name__ == "__main__":
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
     )
 
-    # runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 501, 0.7, 6e-4, 4, 16, 0.7)
+    runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 501, 0.7, 6e-4, 4, 16, 0.7)
     # runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
