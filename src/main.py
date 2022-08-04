@@ -1,4 +1,5 @@
 from collections import namedtuple
+import math
 import os
 import sys
 from pathlib import Path
@@ -173,19 +174,31 @@ class RunModel:
 
         labels = coords[:, 2:3]
         labels = labels[:, 0]
-
+        textstr = ""
+        for x in solution:
+            textstr += f"{coords[x][2:3][0]}\n"
         coords = coords[:, :2].astype(np.float32)
-
-        plt.scatter(coords[:, 0], coords[:, 1])
+        fig, (plot, ax) = plt.subplots(1, 2)
+        ax.axis("off")
+        plot.scatter(coords[:, 0], coords[:, 1])
 
         for i, label in enumerate(labels):
-            plt.annotate(label, (coords[:, 0][i], coords[:, 1][i]))
+            plot.annotate(label, (coords[:, 0][i], coords[:, 1][i]))
 
         n = len(coords)
 
+        ax.text(
+            0.05,
+            0.95,
+            textstr,
+            transform=ax.transAxes,
+            fontsize=14,
+            verticalalignment="top",
+            wrap=True,
+        )
         for idx in range(n - 1):
             i, next_i = solution[idx], solution[idx + 1]
-            plt.plot(
+            plot.plot(
                 [coords[i, 0], coords[next_i, 0]],
                 [coords[i, 1], coords[next_i, 1]],
                 "k",
@@ -194,16 +207,17 @@ class RunModel:
             )
 
         i, next_i = solution[-1], solution[0]
-        plt.plot(
+        plot.plot(
             [coords[i, 0], coords[next_i, 0]],
             [coords[i, 1], coords[next_i, 1]],
             "k",
             lw=2,
             alpha=0.8,
         )
-        plt.xlabel("Number of placements")
-        plt.ylabel("Number of Components")
-        plt.plot(coords[solution[0], 0], coords[solution[0], 1], "x", markersize=10)
+        plot.set(xlabel="Number of placements", ylabel="Number of Components")
+        # plot.xlabel("Number of placements")
+        # plot.ylabel("Number of Components")
+        plot.plot(coords[solution[0], 0], coords[solution[0], 1], "x", markersize=10)
 
     def state2tens(self, state):
         solution = set(state.partial_solution)
@@ -295,26 +309,31 @@ class RunModel:
             running_matrix = []
             numPlacements = coords[i][0]
             numComps = coords[i][1]
+            product = coords[i][2]
             components = coords[i][3]
             assemblyTime = coords[i][4]
             productRequirement = coords[i][5]
             setupTime = Cartsetup(components)
-            # assemblyTime = assemblyTime * productRequirement
+            assemblyTime = assemblyTime * productRequirement
             for j in range(len(coords)):
                 numPlacementsNext = coords[j][0]
                 numCompsNext = coords[j][1]
+                productNext = coords[j][2]
                 componentsNext = coords[j][3]
                 assemblyTimeNext = coords[j][4]
                 productRequirementNext = coords[j][5]
                 setupTimeNext = Cartsetup(componentsNext)
-                # assemblyTimeNext = assemblyTimeNext * productRequirementNext
+                assemblyTimeNext = assemblyTimeNext * productRequirementNext
 
                 overlap = list(set(components) & set(componentsNext))
                 overlapTime = Cartsetup(overlap)
-                timeDifference = (
-                    setupTimeNext - overlapTime + assemblyTime - assemblyTimeNext
-                )
-                running_matrix.append(timeDifference)
+                if product == productNext:
+                    timeDifference = 0
+                else:
+                    timeDifference = (setupTimeNext - overlapTime) + (
+                        assemblyTimeNext - assemblyTime
+                    )
+                running_matrix.append(math.sqrt(timeDifference**2))
 
             global_matrix.append(running_matrix)
 
@@ -342,8 +361,8 @@ class RunModel:
         GAMMA,
     ):
         found_solutions = dict()  # episode --> (coords, W, solution)
-        losses = []
-        path_lengths = []
+        self.losses = []
+        self.path_lengths = []
         current_min_med_length = float("inf")
         for episode in tqdm(range(NR_EPISODES)):
             # sample a new random graph
@@ -482,11 +501,11 @@ class RunModel:
                     loss = Q_func.batch_update(
                         batch_states_tsrs, batch_Ws, batch_actions, batch_targets
                     )
-                    losses.append(loss)
+                    self.losses.append(loss)
 
                     """ Save model when we reach a new low average path length
                     """
-                    med_length = np.median(path_lengths[-100:])
+                    med_length = np.median(self.path_lengths[-100:])
                     if med_length < current_min_med_length:
                         current_min_med_length = med_length
                         self.checkpoint_model(
@@ -494,7 +513,7 @@ class RunModel:
                         )
 
             length, solution = self.helper.total_distance(solution, W)
-            path_lengths.append(length)
+            self.path_lengths.append(length)
 
             if episode % 10 == 0:
                 print(
@@ -502,7 +521,7 @@ class RunModel:
                     % (
                         episode,
                         (-1 if loss is None else loss),
-                        np.median(path_lengths[-50:]),
+                        np.median(self.path_lengths[-50:]),
                         length,
                         epsilon,
                         Q_func.optimizer.param_groups[0]["lr"],
@@ -635,11 +654,11 @@ if __name__ == "__main__":
     np.random.seed(1000)
     torch.manual_seed(1000)
     START_TIME = time.perf_counter()
-    EMBEDDING_DIMENSIONS = 40
+    EMBEDDING_DIMENSIONS = 20
     EMBEDDING_ITERATIONS_T = 8
-    runmodel = RunModel(numSamples=-1)
+    runmodel = RunModel(numSamples=30)
     coords, w_np, product = runmodel.getData()
-    runmodel.plot_graph(coords)
+    # runmodel.plot_graph(coords)
     # print(coords[:, :2], coords.shape)
     # coords, _ = runmodel.get_graph_mat(20)
     # print(coords, coords.shape)
@@ -649,7 +668,8 @@ if __name__ == "__main__":
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
     )
 
-    # runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
+    runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
+    runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     for i in range(5):
