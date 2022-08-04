@@ -108,6 +108,8 @@ class RunModel:
         OPTIMIZER=torch.optim.Adam,
         LR_DECAY_RATE=1.0 - 2e-5,
     ):
+        self.embedding_dimensions = EMBEDDING_DIMENSIONS
+        self.embedding_iterations_t = EMBEDDING_ITERATIONS_T
         Q_net = QNetModel(EMBEDDING_DIMENSIONS, T=EMBEDDING_ITERATIONS_T)
         optimizer = OPTIMIZER(Q_net.parameters(), lr=INIT_LR)
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
@@ -155,6 +157,8 @@ class RunModel:
             os.makedirs(self.folder_name)
 
         fname = os.path.join(self.folder_name, "ep_{}".format(episode))
+        fname += "_emb_{}".format(self.embedding_dimensions)
+        fname += "_it_{}".format(self.embedding_iterations_t)
         fname += "_length_{}".format(avg_length)
         fname += ".tar"
 
@@ -552,8 +556,6 @@ class RunModel:
         self,
         samples,
         plot=False,
-        EMBEDDING_DIMENSIONS=20,
-        EMBEDDING_ITERATIONS_T=8,
     ):
         all_lengths_fnames = [
             f for f in os.listdir(self.folder_name) if f.endswith(".tar")
@@ -561,9 +563,13 @@ class RunModel:
         shortest_fname = sorted(
             all_lengths_fnames, key=lambda s: float(s.split(".tar")[0].split("_")[-1])
         )[0]
+        fname = shortest_fname.split("_")
+        emb = int(fname[fname.index("emb") + 1])
+        it = int(fname[fname.index("it") + 1])
+
         print(
-            "shortest avg length found: {}".format(
-                shortest_fname.split(".tar")[0].split("_")[-1]
+            "shortest avg length found: {} with {} dimensions and {} iterations ".format(
+                shortest_fname.split(".tar")[0].split("_")[-1], emb, it
             )
         )
 
@@ -571,8 +577,8 @@ class RunModel:
         """
         Q_func, Q_net, optimizer, lr_scheduler = self.init_model(
             os.path.join(self.folder_name, shortest_fname),
-            EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
-            EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
+            EMBEDDING_DIMENSIONS=emb,
+            EMBEDDING_ITERATIONS_T=it,
         )
         best_solution = {}
         best_value = float("inf")
@@ -669,9 +675,9 @@ if __name__ == "__main__":
     np.random.seed(1000)
     torch.manual_seed(1000)
     START_TIME = time.perf_counter()
-    EMBEDDING_DIMENSIONS = 20
-    EMBEDDING_ITERATIONS_T = 8
-    runmodel = RunModel(numSamples=30)
+    EMBEDDING_DIMENSIONS = 15
+    EMBEDDING_ITERATIONS_T = 4
+    runmodel = RunModel(numSamples=40)
     coords, w_np, product = runmodel.getData()
     # runmodel.plot_graph(coords)
     # print(coords[:, :2], coords.shape)
@@ -683,8 +689,8 @@ if __name__ == "__main__":
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
     )
 
-    runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
-    runmodel.plotMetrics()
+    # runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 501, 0.7, 6e-4, 4, 16, 0.7)
+    # runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     for i in range(5):
@@ -692,6 +698,4 @@ if __name__ == "__main__":
         runmodel.getBestOder(
             samples=samples,
             plot=True,
-            EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
-            EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
         )
