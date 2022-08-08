@@ -679,7 +679,7 @@ if __name__ == "__main__":
     EMBEDDING_DIMENSIONS = 15
     EMBEDDING_ITERATIONS_T = 4
     runmodel = RunModel(numSamples=40)
-    coords, w_np, product = runmodel.getData()
+    # coords, w_np, product = runmodel.getData()
     # runmodel.plot_graph(coords)
     # print(coords[:, :2], coords.shape)
     # coords, _ = runmodel.get_graph_mat(20)
