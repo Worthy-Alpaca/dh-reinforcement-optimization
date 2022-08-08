@@ -52,12 +52,14 @@ if type(engine) == sqlalchemy.engine.base.Engine:
 
 
 with engine.begin() as connection:
+    runningComponents = pd.DataFrame()
     for i in os.listdir(path):
         for m in ["m10", "m20"]:
             data_path = path / i / m
 
             dataloader = DataLoader(data_path)
             data, components, offsets = dataloader()
+            runningComponents = pd.concat([runningComponents, components])
             tableName = f"{i}_{m}_data"
             data.to_sql(tableName, con=connection, if_exists="replace")
 
@@ -67,6 +69,10 @@ with engine.begin() as connection:
             tableName = f"{i}_{m}_offsets"
             offsets = pd.DataFrame(offsets, columns=["x", "y"])
             offsets.to_sql(tableName, con=connection, if_exists="replace")
+
+    runningComponents = runningComponents.drop_duplicates(subset=["index"])
+    runningComponents = runningComponents.rename(columns={"index": "Component_Code"})
+    runningComponents.to_sql("componentdata", con=connection, if_exists="replace")
     productNames = os.listdir(path)
     productNames = pd.DataFrame(productNames, columns=["Product"])
     productNames.to_sql("products", con=connection, if_exists="replace")
