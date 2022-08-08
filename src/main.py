@@ -3,6 +3,8 @@ import math
 import os
 import sys
 from pathlib import Path
+from types import FunctionType
+from typing import NamedTuple
 from unittest import result
 
 from matplotlib import pyplot as plt
@@ -38,6 +40,11 @@ from misc.dataloader import DataLoader, DataBaseLoader
 
 class RunModel:
     def __init__(self, numSamples: int = 10) -> None:
+        """Initiate the reinforcement learning model and training or prediction capabilities.
+
+        Args:
+            numSamples (int, optional): The batch size for training iterations. Defaults to 10.
+        """
         if torch.cuda.is_available():
             self.device = "cuda:0"
         else:
@@ -102,13 +109,26 @@ class RunModel:
 
     def init_model(
         self,
-        fname=None,
-        EMBEDDING_DIMENSIONS=10,
-        EMBEDDING_ITERATIONS_T=2,
-        INIT_LR=3e-3,
-        OPTIMIZER=torch.optim.Adam,
-        LR_DECAY_RATE=1.0 - 2e-5,
+        fname: str = None,
+        EMBEDDING_DIMENSIONS: int = 10,
+        EMBEDDING_ITERATIONS_T: int = 2,
+        INIT_LR: float = 3e-3,
+        OPTIMIZER: FunctionType = torch.optim.Adam,
+        LR_DECAY_RATE: float = 1.0 - 2e-5,
     ):
+        """Initiate the model state loading. If no `fname` is given, a new model will be initialized.
+
+        Args:
+            fname (str, optional): Path to a saved state_dict. Defaults to None.
+            EMBEDDING_DIMENSIONS (int, optional): Embedding dimensions in the model. Defaults to 10.
+            EMBEDDING_ITERATIONS_T (int, optional): Embedding iterations in the model. Defaults to 2.
+            INIT_LR (float, optional): Initial learning rate. Changes over time. Defaults to 3e-3.
+            OPTIMIZER (FunctionType, optional): The Optimizer to use. Defaults to torch.optim.Adam.
+            LR_DECAY_RATE (float, optional): The decay rate of the initial learning rate. Defaults to 1.0-2e-5.
+
+        Returns:
+            tuple: Returns essential components of the training and prediction process: Q_func, Q_net, optimizer, lr_scheduler
+        """
         self.embedding_dimensions = EMBEDDING_DIMENSIONS
         self.embedding_iterations_t = EMBEDDING_ITERATIONS_T
         Q_net = QNetModel(EMBEDDING_DIMENSIONS, T=EMBEDDING_ITERATIONS_T)
@@ -151,10 +171,20 @@ class RunModel:
         model: torch.nn.Module,
         optimizer: torch.optim,
         lr_scheduler: torch.optim,
-        loss,
-        episode,
-        avg_length,
+        loss: float,
+        episode: int,
+        avg_length: float,
     ):
+        """Method to checkpoint the model.
+
+        Args:
+            model (torch.nn.Module): The current model.
+            optimizer (torch.optim): The current optimizer.
+            lr_scheduler (torch.optim): the current learning rate scheduler.
+            loss (float): The current loss.
+            episode (int): The current episode.
+            avg_length (float): The current average length.
+        """
         if not os.path.exists(self.folder_name):
             os.makedirs(self.folder_name)
 
@@ -176,7 +206,13 @@ class RunModel:
             fname,
         )
 
-    def plot_solution(self, coords, mat, solution):
+    def plot_solution(self, coords: np.ndarray, solution: list):
+        """Method to plot the given coordinates according to the give solution.
+
+        Args:
+            coords (np.ndarray): The current coordinate set.
+            solution (list): The calculated solution.
+        """
 
         labels = coords[:, 2:3]
         labels = labels[:, 0]
@@ -230,9 +266,16 @@ class RunModel:
         # plot.xlabel("Number of placements")
         # plot.ylabel("Number of Components")
         plot.plot(coords[solution[0], 0], coords[solution[0], 1], "x", markersize=10)
-        return solutionList
 
-    def state2tens(self, state):
+    def state2tens(self, state: NamedTuple) -> torch.tensor:
+        """Method to convert a given state into PyTorch tensor.
+
+        Args:
+            state (NamedTuple): The current state.
+
+        Returns:
+            torch.tensor: The created tensor.
+        """
         solution = set(state.partial_solution)
         sol_last_node = (
             state.partial_solution[-1] if len(state.partial_solution) > 0 else -1
@@ -258,10 +301,25 @@ class RunModel:
             xv, dtype=torch.float32, requires_grad=False, device=self.device
         )
 
-    def getRandomSample(self, size):
+    def getRandomSample(self, size: int):
+        """Method to retrieve a random sample based on the given size.
+
+        Args:
+            size (int): The size needed.
+
+        Returns:
+            list: The generated sample.
+        """
         return random.sample(list(self.products.keys()), size)
 
-    def getData(self, key=False, samples=False):
+    def getData(self, key: bool = False, samples: list = False):
+        """Method to get a data sample.
+
+        Args:
+            key (bool, optional): Returns the data for this key if given. Defaults to False.
+            samples (list, optional): Generates the data from the given list of samples. Defaults to False.
+        """
+
         def compare(p1, p2):
             l2 = len(list(set(p1) & set(p2)))
             l1 = len(p1)
@@ -316,6 +374,14 @@ class RunModel:
         return coords, W_np, product
 
     def distance_matrix(self, coords: np.ndarray):
+        """Create a custom distance matrix based on provided coordinate set.
+
+        Args:
+            coords (np.ndarray): The given coordinate set.
+
+        Returns:
+            np.ndarray: The created matrix.
+        """
         nextItems = coords.copy()
         global_matrix = []
         for i in range(len(coords)):
@@ -362,17 +428,31 @@ class RunModel:
 
     def fit(
         self,
-        Q_func,
-        Q_net,
-        optimizer,
-        lr_scheduler,
-        NR_EPISODES,
-        MIN_EPSILON,
-        EPSILON_DECAY_RATE,
-        N_STEP_QL,
-        BATCH_SIZE,
-        GAMMA,
+        Q_func: FunctionType,
+        Q_net: nn.Module,
+        optimizer: FunctionType,
+        lr_scheduler: FunctionType,
+        NR_EPISODES: int,
+        MIN_EPSILON: float,
+        EPSILON_DECAY_RATE: float,
+        N_STEP_QL: int,
+        BATCH_SIZE: int,
+        GAMMA: float,
     ):
+        """Train the current model.
+
+        Args:
+            Q_func (FunctionType): The current Q_function
+            Q_net (nn.Module): The current model.
+            optimizer (FunctionType): The current optimizer function.
+            lr_scheduler (FunctionType): The current learning rate scheduler.
+            NR_EPISODES (int): The number of training iterations.
+            MIN_EPSILON (float): The minimum epsilon value.
+            EPSILON_DECAY_RATE (float): The current epsilon decay rate.
+            N_STEP_QL (int): Placeholder
+            BATCH_SIZE (int): The current batch size.
+            GAMMA (float): The current gamma value.
+        """
         found_solutions = dict()  # episode --> (coords, W, solution)
         self.losses = []
         self.path_lengths = []
@@ -410,12 +490,6 @@ class RunModel:
             t = -1
             while not self.helper.is_state_final(current_state):
                 t += 1  # time step of this episode
-
-                """ ################
-                check helper function
-                line 116
-                
-                """
                 if epsilon >= random.random():
                     # explore
                     next_node = self.helper.get_next_neighbor_random(current_state)
@@ -516,8 +590,6 @@ class RunModel:
                     )
                     self.losses.append(loss)
 
-                    """ Save model when we reach a new low average path length
-                    """
                     med_length = np.median(self.path_lengths[-100:])
                     if med_length < current_min_med_length:
                         current_min_med_length = med_length
@@ -547,6 +619,8 @@ class RunModel:
                 )
 
     def plotMetrics(self):
+        """Method to plot and visualize saved metrics."""
+
         def _moving_avg(x, N=10):
             return np.convolve(np.array(x), np.ones((N,)) / N, mode="valid")
 
@@ -563,9 +637,18 @@ class RunModel:
 
     def getBestOder(
         self,
-        samples,
-        plot=False,
+        samples: list,
+        plot: bool = False,
     ):
+        """Method to predict the best order of the given sample set
+
+        Args:
+            samples (list): The current sample list
+            plot (bool, optional): If the prediction should be plotted. Defaults to False.
+
+        Returns:
+            tuple: The best value and the best solution.
+        """
         all_lengths_fnames = [
             f for f in os.listdir(self.folder_name) if f.endswith(".tar")
         ]
@@ -582,8 +665,6 @@ class RunModel:
             )
         )
 
-        """ Load checkpoint
-        """
         Q_func, Q_net, optimizer, lr_scheduler = self.init_model(
             os.path.join(self.folder_name, shortest_fname),
             EMBEDDING_DIMENSIONS=emb,
@@ -662,7 +743,15 @@ class RunModel:
             plt.show()
         return best_value, best_solution
 
-    def calcSlotSize(self, components):
+    def calcSlotSize(self, components) -> int:
+        """Method to calculate the slot size for the given component list.
+
+        Args:
+            components (list): The current component list.
+
+        Returns:
+            int: The cumulative size of the component feeders.
+        """
         numComponents = 0
         for i in components:
             with self.engine.begin() as connection:
@@ -685,6 +774,14 @@ class RunModel:
         return numComponents
 
     def calcGroups(self, solutionList):
+        """Method to calculate batch queues.
+
+        Args:
+            solutionList (list): The current products according to predicted solution.
+
+        Returns:
+            list: A list containing the batch lists.
+        """
         maxSlots = 36 * 3 * 8
         runningSlots = 0
         solutionListRunning = []
@@ -748,7 +845,7 @@ if __name__ == "__main__":
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
     )
 
-    # runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
+    runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
     # runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
