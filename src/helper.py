@@ -15,7 +15,7 @@ class QFunction:
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.loss_fn = nn.MSELoss()
+        self.loss_fn = nn.L1Loss()
         self.device = device
 
     def predict(self, state_tsr, W):
