@@ -3,6 +3,7 @@ import math
 import os
 import sys
 from pathlib import Path
+from unittest import result
 
 from matplotlib import pyplot as plt
 from model import QNetModel
@@ -56,8 +57,8 @@ class RunModel:
         self.State = namedtuple("State", ("W", "coords", "partial_solution"))
         self.numSamples = numSamples
         self.model = DeployModel(Path(os.getcwd() + os.path.normpath("/FINAL MODEL")))
-        engine = create_engine("sqlite:///products.db")
-        dbData = engine.execute("SELECT * FROM 'products'").fetchall()
+        self.engine = create_engine("sqlite:///products.db")
+        dbData = self.engine.execute("SELECT * FROM 'products'").fetchall()
         prodData = []
         for i in dbData:
             prodData.append(i[1])
@@ -71,7 +72,7 @@ class RunModel:
             allComponents = []
             for m in ["m10", "m20"]:
 
-                dataloader = DataBaseLoader(engine, i, m)
+                dataloader = DataBaseLoader(self.engine, i, m)
                 data, components, offsets = dataloader()
                 if len(data) == 0:
                     Ymax = 0
@@ -180,8 +181,14 @@ class RunModel:
         labels = coords[:, 2:3]
         labels = labels[:, 0]
         textstr = ""
+        solutionList = []
         for x in solution:
-            textstr += f"{coords[x][2:3][0]}\n"
+            solutionList.append(coords[x][2:3][0])
+
+        solutionList = self.calcGroups(solutionList)
+        for x in solutionList:
+            textstr += f"{x}\n"
+
         coords = coords[:, :2].astype(np.float32)
         fig, (plot, ax) = plt.subplots(1, 2)
         ax.axis("off")
@@ -223,6 +230,7 @@ class RunModel:
         # plot.xlabel("Number of placements")
         # plot.ylabel("Number of Components")
         plot.plot(coords[solution[0], 0], coords[solution[0], 1], "x", markersize=10)
+        return solutionList
 
     def state2tens(self, state):
         solution = set(state.partial_solution)
@@ -624,7 +632,7 @@ class RunModel:
                 )[0],
             )
             print(best_solution["coords"][:, :2].astype(np.float32))
-            self.plot_solution(
+            solutionList = self.plot_solution(
                 best_solution["coords"],
                 best_solution["W"],
                 best_solution["solution"],
@@ -638,7 +646,7 @@ class RunModel:
             )
             plt.figure()
             random_solution = list(range(best_solution["coords"].shape[0]))
-            self.plot_solution(
+            solutionListRandom = self.plot_solution(
                 best_solution["coords"],
                 best_solution["W"],
                 random_solution,
@@ -653,6 +661,56 @@ class RunModel:
                 print(best_solution["coords"][x][:3])
             plt.show()
         return best_value, best_solution
+
+    def calcSlotSize(self, components):
+        numComponents = 0
+        for i in components:
+            with self.engine.begin() as connection:
+                result = (
+                    connection.execute(
+                        f"SELECT * FROM 'componentdata' WHERE Component_Code = '{i}'"
+                    )
+                    .first()
+                    ._asdict()
+                )
+                size = result["Feedersize"]
+            if i == "Kreis 1.5mm Bildver" or i == "ATOM":
+                numComponents += 0
+            elif size == "Barcode":
+                numComponents += 40
+            elif size == None:
+                numComponents += 8
+            else:
+                numComponents += int(size)
+        return numComponents
+
+    def calcGroups(self, solutionList):
+        maxSlots = 36 * 3 * 8
+        runningSlots = 0
+        solutionListRunning = []
+        solutionListReturn = []
+        for i in range(len(solutionList)):
+            product = solutionList[i]
+            Components = self.products[product]["comps"]
+            try:
+                ComponentsNext = self.products[solutionList[i + 1]]["comps"]
+            except:
+                ComponentsNext = []
+            overlapComponents = list(set(Components) & set(ComponentsNext))
+            slotSize = self.calcSlotSize(Components)
+            slotSizeOverlap = self.calcSlotSize(overlapComponents)
+            numComponents = slotSize - slotSizeOverlap
+            if numComponents + runningSlots < maxSlots:
+                runningSlots += numComponents
+                solutionListRunning.append(product)
+            else:
+                # runningSlots = 0
+                solutionListReturn.append(solutionListRunning.copy())
+                solutionListRunning.clear()
+                solutionListRunning.append(product)
+                runningSlots = slotSize
+        solutionListReturn.append(solutionListRunning)
+        return solutionListReturn
 
     def plot_graph(self, coords):
         """Utility function to plot the fully connected graph"""
@@ -690,7 +748,7 @@ if __name__ == "__main__":
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
     )
 
-    runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
+    # runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
     # runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
