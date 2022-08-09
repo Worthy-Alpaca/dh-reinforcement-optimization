@@ -15,7 +15,7 @@ class QFunction:
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.loss_fn = nn.L1Loss()
+        self.loss_fn = nn.HuberLoss()
         self.device = device
 
     def predict(self, state_tsr, W):
@@ -102,24 +102,6 @@ class UtilFunctions:
             return 0, solution
 
         total_dist = 0.0
-
-        """for i in range(len(solution) - 1):
-            # print(
-            #     type(self.coords[solution[i], 3]), type(self.coords[solution[i + 1], 3])
-            # )
-            # this is a PROBLEM
-            idx1, idx2 = solution[i], solution[i + 1]
-            if idx2 == None:
-                for x in range(W.shape[0]):
-                    if x in solution:
-                        continue
-                    else:
-                        idx2 = x
-                        solution[i + 1] = x
-
-            l2 = len(list(set(self.coords[idx1, 3]) & set(self.coords[idx2, 3])))
-            l1 = len(self.coords[solution[i], 3])
-            total_dist += l2 / l1"""
 
         for i in range(len(solution) - 1):
             idx1, idx2 = solution[i], solution[i + 1]
