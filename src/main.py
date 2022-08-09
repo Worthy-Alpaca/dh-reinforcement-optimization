@@ -222,6 +222,8 @@ class RunModel:
             solutionList.append(coords[x][2:3][0])
 
         solutionList = self.calcGroups(solutionList)
+        SETUPMINUTES = 10
+        groupTimings = len(solutionList) * SETUPMINUTES * 60
         textstr = f"{len(solutionList)} Groups\n"
         for x in solutionList:
             textstr += f"{x}\n"
@@ -267,6 +269,7 @@ class RunModel:
         # plot.xlabel("Number of placements")
         # plot.ylabel("Number of Components")
         plot.plot(coords[solution[0], 0], coords[solution[0], 1], "x", markersize=10)
+        return groupTimings
 
     def state2tens(self, state: NamedTuple) -> torch.tensor:
         """Method to convert a given state into PyTorch tensor.
@@ -712,7 +715,7 @@ class RunModel:
                 )[0],
             )
             print(best_solution["coords"][:, :2].astype(np.float32))
-            solutionList = self.plot_solution(
+            groupTimings = self.plot_solution(
                 best_solution["coords"],
                 best_solution["solution"],
             )
@@ -721,17 +724,19 @@ class RunModel:
                     self.helper.total_distance(
                         best_solution["solution"], best_solution["W"]
                     )[0]
+                    + groupTimings
                 )
             )
             plt.figure()
             random_solution = list(range(best_solution["coords"].shape[0]))
-            solutionListRandom = self.plot_solution(
+            groupTimings = self.plot_solution(
                 best_solution["coords"],
                 random_solution,
             )
             plt.title(
                 "random / runtime = {}s".format(
                     self.helper.total_distance(random_solution, best_solution["W"])[0]
+                    + groupTimings
                 )
             )
 
@@ -850,4 +855,4 @@ if __name__ == "__main__":
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     for i in range(5):
         samples = runmodel.getRandomSample(15)
-        runmodel.getBestOder(samples=samples, plot=True, numCarts=3)
+        runmodel.getBestOder(samples=samples, plot=True, numCarts=6)
