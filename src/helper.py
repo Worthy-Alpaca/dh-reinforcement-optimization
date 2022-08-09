@@ -114,7 +114,10 @@ class UtilFunctions:
                         solution[i + 1] = x
             x = W[idx1, idx2]
             total_dist += W[idx1, idx2].item()
-            total_dist += 1200
+            # REPLACE CONSTANT WITH FRACTION FOR PROGRAM CHANGES
+            # ADD REMAINDER TO GROUP CALCULATION
+            SETUPMINUTES = 10
+            total_dist += 60 * SETUPMINUTES
 
         if len(solution) == W.shape[0]:
             total_dist += W[solution[-1], solution[0]].item()
