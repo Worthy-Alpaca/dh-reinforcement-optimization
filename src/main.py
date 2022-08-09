@@ -216,12 +216,13 @@ class RunModel:
 
         labels = coords[:, 2:3]
         labels = labels[:, 0]
-        textstr = ""
+
         solutionList = []
         for x in solution:
             solutionList.append(coords[x][2:3][0])
 
         solutionList = self.calcGroups(solutionList)
+        textstr = f"{len(solutionList)} Groups\n"
         for x in solutionList:
             textstr += f"{x}\n"
 
@@ -635,20 +636,18 @@ class RunModel:
         plt.xlabel("episode")
         plt.show()
 
-    def getBestOder(
-        self,
-        samples: list,
-        plot: bool = False,
-    ):
+    def getBestOder(self, samples: list, plot: bool = False, numCarts: int = 6):
         """Method to predict the best order of the given sample set
 
         Args:
             samples (list): The current sample list
             plot (bool, optional): If the prediction should be plotted. Defaults to False.
+            numCarts (int, optional): How many cartbays can be used alltogether. Defaults to 6.
 
         Returns:
             tuple: The best value and the best solution.
         """
+        self.numCarts = numCarts
         all_lengths_fnames = [
             f for f in os.listdir(self.folder_name) if f.endswith(".tar")
         ]
@@ -715,7 +714,6 @@ class RunModel:
             print(best_solution["coords"][:, :2].astype(np.float32))
             solutionList = self.plot_solution(
                 best_solution["coords"],
-                best_solution["W"],
                 best_solution["solution"],
             )
             plt.title(
@@ -729,7 +727,6 @@ class RunModel:
             random_solution = list(range(best_solution["coords"].shape[0]))
             solutionListRandom = self.plot_solution(
                 best_solution["coords"],
-                best_solution["W"],
                 random_solution,
             )
             plt.title(
@@ -769,6 +766,8 @@ class RunModel:
                 numComponents += 40
             elif size == None:
                 numComponents += 8
+            elif int(size) == 12:
+                numComponents += 16
             else:
                 numComponents += int(size)
         return numComponents
@@ -782,7 +781,7 @@ class RunModel:
         Returns:
             list: A list containing the batch lists.
         """
-        maxSlots = 36 * 3 * 8
+        maxSlots = 36 * self.numCarts * 8
         runningSlots = 0
         solutionListRunning = []
         solutionListReturn = []
@@ -831,8 +830,8 @@ if __name__ == "__main__":
     np.random.seed(1000)
     torch.manual_seed(1000)
     START_TIME = time.perf_counter()
-    EMBEDDING_DIMENSIONS = 15
-    EMBEDDING_ITERATIONS_T = 4
+    EMBEDDING_DIMENSIONS = 20
+    EMBEDDING_ITERATIONS_T = 5
     runmodel = RunModel(numSamples=40)
     # coords, w_np, product = runmodel.getData()
     # runmodel.plot_graph(coords)
@@ -845,13 +844,10 @@ if __name__ == "__main__":
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
     )
 
-    runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
+    # runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
     # runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     for i in range(5):
         samples = runmodel.getRandomSample(15)
-        runmodel.getBestOder(
-            samples=samples,
-            plot=True,
-        )
+        runmodel.getBestOder(samples=samples, plot=True, numCarts=3)
