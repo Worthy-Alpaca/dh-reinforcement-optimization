@@ -39,19 +39,21 @@ from misc.dataloader import DataLoader, DataBaseLoader
 
 
 class RunModel:
-    def __init__(self, numSamples: int = 10) -> None:
+    def __init__(self, numSamples: int = 10, tuning: bool = False) -> None:
         """Initiate the reinforcement learning model and training or prediction capabilities.
 
         Args:
             numSamples (int, optional): The batch size for training iterations. Defaults to 10.
+            tuning (bool, optional): Whether the model is in training mode. Dictates if saved models will be deleted. Defaults to False.
         """
         if torch.cuda.is_available():
             self.device = "cuda:0"
         else:
             self.device = "cpu"
         self.folder_name = "./models"
-        # if os.path.exists(self.folder_name):
-        # shutil.rmtree(self.folder_name)
+        if tuning:
+            if os.path.exists(self.folder_name):
+                shutil.rmtree(self.folder_name)
 
         self.products = {}
         self.memory = Memory()
@@ -373,6 +375,67 @@ class RunModel:
         W_np = self.distance_matrix(coords)
         return coords, W_np, product
 
+    def createValidateData(
+        self,
+        samples: list,
+        sampleReqs: list,
+        key: bool = False,
+    ):
+        """Generates the validation dataset.
+
+        Args:
+            samples (list): The list of samples to be used.
+            sampleReqs (list): The list of production values.
+            key (bool, optional): The current starting point. Defaults to False.
+
+        Raises:
+            KeyError: If samples and sampleReqs are not the same length.
+
+        Returns:
+            tuple: The generated coordinates, the generated distance matrix and the current product name.
+        """
+        if len(sampleReqs) != len(samples):
+            raise KeyError("Lenth of Samples and Required Production must be the same!")
+        globalList = {}
+        for i in samples:
+            currentList = set(samples.copy())
+            currentList.remove(i)
+            currentDict = [
+                [
+                    self.products[i]["len"],
+                    len(self.products[i]["comps"]),
+                    i,
+                    self.products[i]["comps"],
+                    self.products[i]["time"],
+                    sampleReqs[samples.index(i)],
+                ]
+            ]
+            for j in currentList:
+                currentDict.append(
+                    [
+                        self.products[j]["len"],
+                        len(self.products[j]["comps"]),
+                        j,
+                        self.products[j]["comps"],
+                        self.products[j]["time"],
+                        sampleReqs[samples.index(j)],
+                    ]
+                )
+            globalList[i] = currentDict
+
+        npArray = []
+        if key == False:
+            product, coords = random.choice(list(globalList.items()))
+        else:
+            coords = globalList[key]
+            product = key
+        for i in coords:
+            npArray.append(i)
+
+        coords = np.asarray(npArray, dtype=object)
+        W_np = self.distance_matrix(coords)
+        return coords, W_np, product
+
     def distance_matrix(self, coords: np.ndarray):
         """Create a custom distance matrix based on provided coordinate set.
 
@@ -635,13 +698,22 @@ class RunModel:
         plt.xlabel("episode")
         plt.show()
 
-    def getBestOder(self, samples: list, plot: bool = False, numCarts: int = 6):
+    def getBestOder(
+        self,
+        samples: list,
+        plot: bool = False,
+        numCarts: int = 6,
+        validate: bool = False,
+        sampleReqs: list = False,
+    ):
         """Method to predict the best order of the given sample set
 
         Args:
             samples (list): The current sample list
             plot (bool, optional): If the prediction should be plotted. Defaults to False.
             numCarts (int, optional): How many cartbays can be used alltogether. Defaults to 6.
+            validate (bool, optional): If the validation dataset should be used. Defaults to False.
+            sampleReqs (list, optional): The required production values for the validation set. Defaults to False.
 
         Returns:
             tuple: The best value and the best solution.
@@ -672,7 +744,12 @@ class RunModel:
         best_value = float("inf")
 
         for i in samples:
-            coords, W_np, _ = self.getData(key=i, samples=samples)
+            if validate and sampleReqs != False:
+                coords, W_np, _ = self.createValidateData(
+                    samples=samples, sampleReqs=sampleReqs, key=i
+                )
+            else:
+                coords, W_np, _ = self.getData(key=i, samples=samples)
             self.helper = UtilFunctions(coords)
             # plot_graph(coords, 1)
             # plt.show()
@@ -833,7 +910,7 @@ if __name__ == "__main__":
     START_TIME = time.perf_counter()
     EMBEDDING_DIMENSIONS = 20
     EMBEDDING_ITERATIONS_T = 5
-    runmodel = RunModel(numSamples=40)
+    runmodel = RunModel(numSamples=40, tuning=True)
     # coords, w_np, product = runmodel.getData()
     # runmodel.plot_graph(coords)
     # print(coords[:, :2], coords.shape)
@@ -847,27 +924,43 @@ if __name__ == "__main__":
         OPTIMIZER=torch.optim.SGD,
     )
 
-    # runmodel.fit(
-    #     Q_func=Q_Function,
-    #     Q_net=QNet,
-    #     optimizer=Adam,
-    #     lr_scheduler=ExponentialLR,
-    #     NR_EPISODES=2001,
-    #     MIN_EPSILON=0.7,
-    #     EPSILON_DECAY_RATE=6e-4,
-    #     N_STEP_QL=4,
-    #     BATCH_SIZE=16,
-    #     GAMMA=0.7,
-    # )
+    runmodel.fit(
+        Q_func=Q_Function,
+        Q_net=QNet,
+        optimizer=Adam,
+        lr_scheduler=ExponentialLR,
+        NR_EPISODES=2001,
+        MIN_EPSILON=0.7,
+        EPSILON_DECAY_RATE=6e-4,
+        N_STEP_QL=4,
+        BATCH_SIZE=16,
+        GAMMA=0.7,
+    )
     # runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
-    samples = runmodel.getRandomSample(15)
+    samples = [
+        "3010222",
+        "2799760",
+        "2696051",
+        "2696118",
+        "2696155",
+        "2489800",
+        "2196820",
+        "3010733",
+        "2696086",
+        "2696108",
+        "2696036",
+        "2799762",
+        "2495850",
+        "2799752",
+        "2799764",
+    ]
+    sampleReqs = [40, 12, 70, 65, 13, 123, 58, 47, 30, 31, 55, 723, 64, 21, 84]
+    runmodel.getBestOder(
+        sampleReqs=sampleReqs, samples=samples, validate=True, plot=True
+    )
+    exit()
     for i in range(5):
-
-        x, y, z = runmodel.getData(samples=samples, key="2196820")
-        # [882, 57, '2196820', 268.49534112548827, 50]
-        #
-        continue
         samples = runmodel.getRandomSample(15)
         runmodel.getBestOder(samples=samples, plot=True, numCarts=6)
