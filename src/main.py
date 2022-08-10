@@ -370,10 +370,6 @@ class RunModel:
             npArray.append(i)
 
         coords = np.asarray(npArray, dtype=object)
-        # print(coords[:, :2])
-        W_np = distance_matrix(
-            coords[:, :2].astype(np.float32), coords[:, :2].astype(np.float32)
-        )
         W_np = self.distance_matrix(coords)
         return coords, W_np, product
 
@@ -845,14 +841,33 @@ if __name__ == "__main__":
     # print(coords, coords.shape)
     # exit()
     Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
+        INIT_LR=0.007,
         EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
+        OPTIMIZER=torch.optim.SGD,
     )
 
-    # runmodel.fit(Q_Function, QNet, Adam, ExponentialLR, 2001, 0.7, 6e-4, 4, 16, 0.7)
+    # runmodel.fit(
+    #     Q_func=Q_Function,
+    #     Q_net=QNet,
+    #     optimizer=Adam,
+    #     lr_scheduler=ExponentialLR,
+    #     NR_EPISODES=2001,
+    #     MIN_EPSILON=0.7,
+    #     EPSILON_DECAY_RATE=6e-4,
+    #     N_STEP_QL=4,
+    #     BATCH_SIZE=16,
+    #     GAMMA=0.7,
+    # )
     # runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
+    samples = runmodel.getRandomSample(15)
     for i in range(5):
+
+        x, y, z = runmodel.getData(samples=samples, key="2196820")
+        # [882, 57, '2196820', 268.49534112548827, 50]
+        #
+        continue
         samples = runmodel.getRandomSample(15)
         runmodel.getBestOder(samples=samples, plot=True, numCarts=6)
