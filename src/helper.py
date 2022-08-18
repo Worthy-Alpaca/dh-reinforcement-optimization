@@ -15,7 +15,7 @@ class QFunction:
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.loss_fn = nn.HuberLoss()
+        self.loss_fn = nn.L1Loss()
         self.device = device
 
     def predict(self, state_tsr, W):
@@ -117,7 +117,7 @@ class UtilFunctions:
             # REPLACE CONSTANT WITH FRACTION FOR PROGRAM CHANGES
             # ADD REMAINDER TO GROUP CALCULATION
             SETUPMINUTES = 10
-            total_dist += 60 * SETUPMINUTES
+            total_dist += 1200  # 60 * SETUPMINUTES
 
         if len(solution) == W.shape[0]:
             total_dist += W[solution[-1], solution[0]].item()
