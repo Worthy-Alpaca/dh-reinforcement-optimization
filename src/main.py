@@ -39,7 +39,9 @@ from misc.dataloader import DataLoader, DataBaseLoader
 
 
 class RunModel:
-    def __init__(self, numSamples: int = 10, tuning: bool = False) -> None:
+    def __init__(
+        self, numSamples: int = 10, tuning: bool = False, allowDuplicates: bool = False
+    ) -> None:
         """Initiate the reinforcement learning model and training or prediction capabilities.
 
         Args:
@@ -65,6 +67,7 @@ class RunModel:
         )
         self.State = namedtuple("State", ("W", "coords", "partial_solution"))
         self.numSamples = numSamples
+        self.allowDuplicates = allowDuplicates
         self.model = DeployModel(Path(os.getcwd() + os.path.normpath("/FINAL MODEL")))
         self.engine = create_engine("sqlite:///products.db")
         dbData = self.engine.execute("SELECT * FROM 'products'").fetchall()
@@ -316,7 +319,11 @@ class RunModel:
         Returns:
             list: The generated sample.
         """
-        return random.sample(list(self.products.keys()), size)
+        listkeys = np.random.choice(
+            len(self.products.keys()), size=size, replace=self.allowDuplicates
+        )
+
+        return [list(self.products.keys())[x] for x in listkeys]
 
     def getData(self, key: bool = False, samples: list = False):
         """Method to get a data sample.
@@ -335,9 +342,9 @@ class RunModel:
         if samples:
             sampleSize = samples
         else:
-            sampleSize = random.sample(list(self.products.keys()), self.numSamples)
+            sampleSize = self.getRandomSample(self.numSamples)
         for i in sampleSize:
-            currentList = set(sampleSize.copy())
+            currentList = sampleSize.copy()
             currentList.remove(i)
             # currentDict = [[self.products[i]["len"] / 1000, 1]]
             currentDict = [
@@ -361,6 +368,8 @@ class RunModel:
                         random.randint(1, 50),
                     ]
                 )
+            if i in globalList:
+                i = i + "'"
             globalList[i] = currentDict
         npArray = []
         if key == False:
@@ -398,7 +407,7 @@ class RunModel:
             raise KeyError("Lenth of Samples and Required Production must be the same!")
         globalList = {}
         for i in samples:
-            currentList = set(samples.copy())
+            currentList = samples.copy()
             currentList.remove(i)
             currentDict = [
                 [
@@ -421,6 +430,8 @@ class RunModel:
                         sampleReqs[samples.index(j)],
                     ]
                 )
+            if i in globalList:
+                i = i + "'"
             globalList[i] = currentDict
 
         npArray = []
@@ -472,10 +483,11 @@ class RunModel:
                 if product == productNext:
                     timeDifference = 0
                 else:
-                    timeDifference = (setupTimeNext - overlapTime) + (
+                    timeDifference = (setupTimeNext - overlapTime + setupTime) + (
                         assemblyTimeNext - assemblyTime
                     )
-                running_matrix.append(math.sqrt(timeDifference**2))
+                running_matrix.append(timeDifference)
+                # running_matrix.append(math.sqrt(timeDifference**2))
 
             global_matrix.append(running_matrix)
 
@@ -908,8 +920,8 @@ if __name__ == "__main__":
     np.random.seed(1000)
     torch.manual_seed(1000)
     START_TIME = time.perf_counter()
-    EMBEDDING_DIMENSIONS = 20
-    EMBEDDING_ITERATIONS_T = 5
+    EMBEDDING_DIMENSIONS = 40
+    EMBEDDING_ITERATIONS_T = 10
     runmodel = RunModel(numSamples=40, tuning=True)
     # coords, w_np, product = runmodel.getData()
     # runmodel.plot_graph(coords)
@@ -918,25 +930,24 @@ if __name__ == "__main__":
     # print(coords, coords.shape)
     # exit()
     Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
-        INIT_LR=0.007,
+        INIT_LR=0.07,
         EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
         OPTIMIZER=torch.optim.SGD,
     )
-
     runmodel.fit(
         Q_func=Q_Function,
         Q_net=QNet,
         optimizer=Adam,
         lr_scheduler=ExponentialLR,
         NR_EPISODES=2001,
-        MIN_EPSILON=0.7,
+        MIN_EPSILON=0.2,
         EPSILON_DECAY_RATE=6e-4,
-        N_STEP_QL=4,
+        N_STEP_QL=8,
         BATCH_SIZE=16,
-        GAMMA=0.7,
+        GAMMA=0.5,
     )
-    # runmodel.plotMetrics()
+    runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     samples = [
@@ -949,7 +960,7 @@ if __name__ == "__main__":
         "2196820",
         "3010733",
         "2696086",
-        "2696108",
+        "3010222",
         "2696036",
         "2799762",
         "2495850",
@@ -958,9 +969,9 @@ if __name__ == "__main__":
     ]
     sampleReqs = [40, 12, 70, 65, 13, 123, 58, 47, 30, 31, 55, 723, 64, 21, 84]
     runmodel.getBestOder(
-        sampleReqs=sampleReqs, samples=samples, validate=True, plot=True
+        sampleReqs=sampleReqs, samples=samples, validate=True, plot=True, numCarts=3
     )
-    exit()
+    # exit()
     for i in range(5):
         samples = runmodel.getRandomSample(15)
-        runmodel.getBestOder(samples=samples, plot=True, numCarts=6)
+        runmodel.getBestOder(samples=samples, plot=True, numCarts=3)
