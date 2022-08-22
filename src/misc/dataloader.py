@@ -166,30 +166,60 @@ class DataLoader:
 
 class DataBaseLoader:
     def __init__(
-        self, dataBase: sqlalchemy.engine.base.Engine, product: str, machine: str
+        self,
+        dataBase: sqlalchemy.engine.base.Engine,
+        product: str,
+        allProducts: list,
     ) -> None:
         """Load the required Data from the ``products.db`` database.
 
         Args:
             dataBase (sqlalchemy.engine.base.Engine): The current database connection.
             product (str): The current product name.
-            machine (str): The current machine name.
+            allProducts (list): List of all available products.
         """
         with dataBase.begin() as connection:
-            tableName = f"{product}_{machine}_data"
+            tableName = f"{product}_placementData"
             self.data = pd.read_sql_table(tableName, connection)
-            tableName = f"{product}_{machine}_components"
-            self.components = pd.read_sql_table(tableName, connection)
-            tableName = f"{product}_{machine}_offsets"
-            offsets = pd.read_sql_table(tableName, connection)
-            offsetList = []
-            for i, r in offsets.iterrows():
-                currentOffset = (r.x, r.y)
-                offsetList.append(currentOffset)
-            self.offsets = offsetList
+            self.data["X"] = (
+                self.data["X"].replace({",": "."}, regex=True).astype(float)
+            )
+            self.data["Y"] = (
+                self.data["Y"].replace({",": "."}, regex=True).astype(float)
+            )
+            self.components = self.data["Code"].unique()
+
+            try:
+                numOffsets = connection.execute(
+                    f"SELECT * FROM 'products' WHERE product = '{product}' "
+                ).fetchall()[0][1]
+            except:
+                numOffsets = 1
+
+            self.offsets = numOffsets
+
+            score = 0
+            allProducts = len(allProducts)
+            for x in self.components:
+                tempScore = connection.execute(
+                    f"SELECT * FROM 'allcomponents' WHERE component = '{x}'"
+                ).fetchall()[0][1]
+                score += tempScore / allProducts
+
+            self.score = score
+
+            # tableName = f"{product}_{machine}_components"
+            # self.components = pd.read_sql_table(tableName, connection)
+            # tableName = f"{product}_{machine}_offsets"
+            # offsets = pd.read_sql_table(tableName, connection)
+            # offsetList = []
+            # for i, r in offsets.iterrows():
+            #     currentOffset = (r.x, r.y)
+            #     offsetList.append(currentOffset)
+            # self.offsets = offsetList
 
     def __call__(self):
-        return (self.data, self.components.drop_duplicates(), self.offsets)
+        return (self.data, self.components, self.offsets, self.score)
 
 
 if __name__ == "__main__":
