@@ -73,7 +73,7 @@ class RunModel:
         dbData = self.engine.execute("SELECT * FROM 'products'").fetchall()
         prodData = []
         for i in dbData:
-            prodData.append(i[1])
+            prodData.append(i[0])
 
         # prodData = random.sample(prodData, self.numSamples)
         print("Generating Data")
@@ -84,31 +84,37 @@ class RunModel:
             allComponents = []
             for m in ["m10", "m20"]:
 
-                dataloader = DataBaseLoader(self.engine, i, m)
-                data, components, offsets = dataloader()
+                dataloader = DataBaseLoader(self.engine, i, prodData)
+                data, components, offsets, score = dataloader()
+                rowOffsets = offsets / 2
+                rowOffsets = offsets / rowOffsets
                 if len(data) == 0:
                     Ymax = 0
                     Xmax = 0
                 else:
-                    Ymax = data["Y"].max() + max(offsets[1])
-                    Xmax = data["X"].max() + max(offsets[0])
+                    Ymax = data["Y"].max() * rowOffsets
+                    Xmax = data["X"].max() * rowOffsets
                 predArray = np.array(
-                    [len(data) * len(offsets), 0 if m == "m10" else 1, Xmax, Ymax]
+                    [len(data) / 2 * rowOffsets, 0 if m == "m10" else 1, Xmax, Ymax]
                 )
-                overallTime += self.model.predict(predArray).item()
-                overallTime += Coating(Ymax)
-                overallLen += len(data) * len(offsets)
 
-                allComponents.append(components["index"].unique())
+                overallTime += self.model.predict(predArray).item()
+            overallTime = overallTime / 2
+            overallTime += Coating(Ymax * rowOffsets)
+            overallTime += Cartsetup(components)
+            overallLen += len(data) * rowOffsets
+
+            allComponents.append(components)
 
             self.products[product] = {
                 "len": overallLen,
                 "time": overallTime,
+                "score": score,
                 "comps": list(
                     dict.fromkeys(list(itertools.chain.from_iterable(allComponents)))
                 ),
             }
-        print("Data generation done")
+        print("Data generation complete")
         if numSamples == -1:
             self.numSamples = len(self.products.keys())
 
@@ -155,7 +161,7 @@ class RunModel:
         )
         solution = [random.randint(0, coords.shape[0] - 1)]
         current_state = self.State(
-            partial_solution=solution, W=W, coords=coords[:, :2].astype(np.float32)
+            partial_solution=solution, W=W, coords=coords[:, :3].astype(np.float32)
         )
         state_tsr = self.state2tens(current_state)
 
@@ -220,27 +226,32 @@ class RunModel:
             solution (list): The calculated solution.
         """
 
-        labels = coords[:, 2:3]
+        labels = coords[:, 3:4]
         labels = labels[:, 0]
 
         solutionList = []
         for x in solution:
-            solutionList.append(coords[x][2:3][0])
+            solutionList.append(coords[x][3:4][0])
 
-        solutionList = self.calcGroups(solutionList)
+        # solutionList = self.calcGroups(solutionList)
         SETUPMINUTES = 10
         groupTimings = len(solutionList) * SETUPMINUTES * 60
         textstr = f"{len(solutionList)} Groups\n"
         for x in solutionList:
             textstr += f"{x}\n"
 
-        coords = coords[:, :2].astype(np.float32)
-        fig, (plot, ax) = plt.subplots(1, 2)
+        coords = coords[:, :3].astype(np.float32)
+        fig = plt.figure()
+        plot = fig.add_subplot(121, projection="3d")
+        ax = fig.add_subplot(122)
         ax.axis("off")
-        plot.scatter(coords[:, 0], coords[:, 1])
+        plot.scatter(coords[:, 0], coords[:, 1], coords[:, 2])
 
-        for i, label in enumerate(labels):
-            plot.annotate(label, (coords[:, 0][i], coords[:, 1][i]))
+        # for i, label in enumerate(labels):
+        #     x = coords[:, 0][i]
+        #     y = coords[:, 1][i]
+        #     z = coords[:, 2][i]
+        #     plot.annotate(label, (x, y, z))
 
         n = len(coords)
 
@@ -258,6 +269,7 @@ class RunModel:
             plot.plot(
                 [coords[i, 0], coords[next_i, 0]],
                 [coords[i, 1], coords[next_i, 1]],
+                [coords[i, 2], coords[next_i, 2]],
                 "k",
                 lw=2,
                 alpha=0.8,
@@ -267,14 +279,25 @@ class RunModel:
         plot.plot(
             [coords[i, 0], coords[next_i, 0]],
             [coords[i, 1], coords[next_i, 1]],
+            [coords[i, 2], coords[next_i, 2]],
             "k",
             lw=2,
             alpha=0.8,
         )
-        plot.set(xlabel="Number of placements", ylabel="Number of Components")
+        plot.set(
+            xlabel="Number of placements",
+            ylabel="Number of Components",
+            zlabel="Cumulative Component Score",
+        )
         # plot.xlabel("Number of placements")
         # plot.ylabel("Number of Components")
-        plot.plot(coords[solution[0], 0], coords[solution[0], 1], "x", markersize=10)
+        plot.plot(
+            coords[solution[0], 0],
+            coords[solution[0], 1],
+            coords[solution[0], 2],
+            "x",
+            markersize=10,
+        )
         return groupTimings
 
     def state2tens(self, state: NamedTuple) -> torch.tensor:
@@ -293,7 +316,7 @@ class RunModel:
         sol_first_node = (
             state.partial_solution[0] if len(state.partial_solution) > 0 else -1
         )
-        coords = state.coords[:, :2].astype(np.float32)
+        coords = state.coords[:, :3].astype(np.float32)
         nr_nodes = coords.shape[0]
 
         xv = [
@@ -303,6 +326,7 @@ class RunModel:
                 (1 if i == sol_last_node else 0),
                 coords[i, 0],
                 coords[i, 1],
+                coords[i, 2],
             ]
             for i in range(nr_nodes)
         ]
@@ -351,28 +375,28 @@ class RunModel:
             # currentDict = [[self.products[i]["len"] / 1000, 1]]
             currentDict.append(
                 [
-                    float(self.products[i]["len"]),
-                    self.products[i]["time"],
-                    1.0,
+                    (float(self.products[i]["len"])),
+                    (self.products[i]["time"]),
+                    (self.products[i]["score"]),
                     i,
-                    "comps",  # self.products[i]["comps"],
+                    self.products[i]["comps"],
                     float(len(self.products[i]["comps"])),
                     random.randint(1, 50),
                 ]
             )
-            for j in currentList:
-                overlap = compare(self.products[i]["comps"], self.products[j]["comps"])
-                currentDict.append(
-                    [
-                        float(self.products[j]["len"]),
-                        self.products[j]["time"],
-                        overlap,
-                        j,
-                        "comps",  # self.products[j]["comps"],
-                        float(len(self.products[j]["comps"])),
-                        random.randint(1, 50),
-                    ]
-                )
+            # for j in currentList:
+            #     overlap = compare(self.products[i]["comps"], self.products[j]["comps"])
+            #     currentDict.append(
+            #         [
+            #             math.log(float(self.products[j]["len"])),
+            #             math.log(self.products[j]["time"]),
+            #             math.log(self.products[j]["score"]),
+            #             j,
+            #             "comps",  # self.products[j]["comps"],
+            #             float(len(self.products[j]["comps"])),
+            #             random.randint(1, 50),
+            #         ]
+            #     )
             if i in globalList:
                 i = i + "'"
             globalList[i] = currentDict
@@ -382,16 +406,16 @@ class RunModel:
         else:
             coords = globalList[key]
             product = key
-        coords = currentDict
+        # coords = currentDict
         for i in coords:
             npArray.append(i)
 
         coords = np.asarray(coords, dtype=object)
         # test = coords[:, :3].astype(np.float32)
         W_np = distance_matrix(
-            coords[:, :2].astype(np.float32), coords[:, :2].astype(np.float32)
+            coords[:, :3].astype(np.float32), coords[:, :3].astype(np.float32)
         )
-        test = self.distance_matrix(coords)
+        # test = self.distance_matrix(coords)
         return coords, W_np, product
 
     def createValidateData(
@@ -421,22 +445,24 @@ class RunModel:
             currentList.remove(i)
             currentDict = [
                 [
-                    self.products[i]["len"],
-                    len(self.products[i]["comps"]),
+                    math.log(float(self.products[i]["len"])),
+                    math.log(self.products[i]["time"]),
+                    math.log(self.products[i]["score"]),
                     i,
-                    self.products[i]["comps"],
-                    self.products[i]["time"],
+                    "comps",  # self.products[i]["comps"],
+                    float(len(self.products[i]["comps"])),
                     sampleReqs[samples.index(i)],
                 ]
             ]
             for j in currentList:
                 currentDict.append(
                     [
-                        self.products[j]["len"],
-                        len(self.products[j]["comps"]),
+                        math.log(float(self.products[j]["len"])),
+                        math.log(self.products[j]["time"]),
+                        math.log(self.products[j]["score"]),
                         j,
-                        self.products[j]["comps"],
-                        self.products[j]["time"],
+                        "comps",  # self.products[j]["comps"],
+                        float(len(self.products[j]["comps"])),
                         sampleReqs[samples.index(j)],
                     ]
                 )
@@ -454,7 +480,9 @@ class RunModel:
             npArray.append(i)
 
         coords = np.asarray(npArray, dtype=object)
-        W_np = self.distance_matrix(coords)
+        W_np = distance_matrix(
+            coords[:, :3].astype(np.float32), coords[:, :3].astype(np.float32)
+        )
         return coords, W_np, product
 
     def distance_matrix(self, coords: np.ndarray):
@@ -507,7 +535,7 @@ class RunModel:
         """Throws n nodes uniformly at random on a square, and build a (fully connected) graph.
         Returns the (N, 2) coordinates matrix, and the (N, N) matrix containing pairwise euclidean distances.
         """
-        coords = size * np.random.uniform(size=(n, 2))
+        coords = size * np.random.uniform(size=(n, 3))
         dist_mat = distance_matrix(coords, coords)
         return coords, dist_mat
 
@@ -556,7 +584,7 @@ class RunModel:
 
             # current state (tuple and tensor)
             current_state = self.State(
-                partial_solution=solution, W=W, coords=coords[:, :2].astype(np.float32)
+                partial_solution=solution, W=W, coords=coords[:, :3].astype(np.float32)
             )
             current_state_tsr = self.state2tens(current_state)
 
@@ -609,7 +637,7 @@ class RunModel:
                 next_state = self.State(
                     partial_solution=next_solution,
                     W=W,
-                    coords=coords[:, :2].astype(np.float32),
+                    coords=coords[:, :3].astype(np.float32),
                 )
                 next_state_tsr = self.state2tens(next_state)
 
@@ -765,51 +793,54 @@ class RunModel:
         best_solution = {}
         best_value = float("inf")
 
-        for i in samples:
-            if validate and sampleReqs != False:
-                coords, W_np, _ = self.createValidateData(
-                    samples=samples, sampleReqs=sampleReqs, key=i
-                )
-            else:
-                coords, W_np, _ = self.getData(key=i, samples=samples)
-            self.helper = UtilFunctions(coords)
-            # plot_graph(coords, 1)
-            # plt.show()
-            # coords, W_np = get_graph_mat(n=NR_NODES)
-            W = torch.tensor(
-                W_np, dtype=torch.float32, requires_grad=False, device=self.device
+        # for i in samples:
+        if validate and sampleReqs != False:
+            coords, W_np, _ = self.createValidateData(
+                samples=samples,
+                sampleReqs=sampleReqs,  # key=i
+            )
+        else:
+            coords, W_np, _ = self.getData(samples=samples)
+        self.helper = UtilFunctions(coords)
+        # plot_graph(coords, 1)
+        # plt.show()
+        # coords, W_np = get_graph_mat(n=NR_NODES)
+        W = torch.tensor(
+            W_np, dtype=torch.float32, requires_grad=False, device=self.device
+        )
+
+        solution = [random.randint(0, coords.shape[0] - 1)]
+        current_state = self.State(
+            partial_solution=solution, W=W, coords=coords[:, :3].astype(np.float32)
+        )
+        current_state_tsr = self.state2tens(current_state)
+
+        while not self.helper.is_state_final(current_state):
+            next_node, est_reward = Q_func.get_best_action(
+                current_state_tsr, current_state
             )
 
-            solution = [random.randint(0, coords.shape[0] - 1)]
+            solution = solution + [next_node]
             current_state = self.State(
-                partial_solution=solution, W=W, coords=coords[:, :2].astype(np.float32)
+                partial_solution=solution,
+                W=W,
+                coords=coords[:, :3].astype(np.float32),
             )
             current_state_tsr = self.state2tens(current_state)
 
-            while not self.helper.is_state_final(current_state):
-                next_node, est_reward = Q_func.get_best_action(
-                    current_state_tsr, current_state
-                )
-
-                solution = solution + [next_node]
-                current_state = self.State(
-                    partial_solution=solution, W=W, coords=coords
-                )
-                current_state_tsr = self.state2tens(current_state)
-
-            if self.helper.total_distance(solution, W)[0] < best_value:
-                best_value, solution = self.helper.total_distance(solution, W)
-                best_solution = {"W": W, "solution": solution, "coords": coords}
+        if self.helper.total_distance(solution, W)[0] < best_value:
+            best_value, solution = self.helper.total_distance(solution, W)
+            best_solution = {"W": W, "solution": solution, "coords": coords}
 
         if plot:
-            plt.figure()
+            # plt.figure()
             print(
                 "The best value for this iteration is: ",
                 self.helper.total_distance(
                     best_solution["solution"], best_solution["W"]
                 )[0],
             )
-            print(best_solution["coords"][:, :2].astype(np.float32))
+            print(best_solution["coords"][:, :3].astype(np.float32))
             groupTimings = self.plot_solution(
                 best_solution["coords"],
                 best_solution["solution"],
@@ -822,7 +853,7 @@ class RunModel:
                     + groupTimings
                 )
             )
-            plt.figure()
+            # plt.figure()
             random_solution = list(range(best_solution["coords"].shape[0]))
             groupTimings = self.plot_solution(
                 best_solution["coords"],
@@ -932,16 +963,27 @@ if __name__ == "__main__":
     START_TIME = time.perf_counter()
     EMBEDDING_DIMENSIONS = 40
     EMBEDDING_ITERATIONS_T = 10
-    runmodel = RunModel(numSamples=5, tuning=True)
+    runmodel = RunModel(numSamples=5, tuning=False)
     # coords, w_np, product = runmodel.getData()
     # runmodel.plot_graph(coords)
     # print(coords[:, :2], coords.shape)
     # coords, _ = runmodel.get_graph_mat(20)
     # print(coords, coords.shape)
     # exit()
+    # x, y = runmodel.get_graph_mat(5)
+    # print(x, y.shape)
 
     # x, y, _ = runmodel.getData()
-    # print(y)
+    # print(x, y.shape)
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection="3d")
+
+    # ax.scatter(
+    #     x[:, 0].astype(np.float32),
+    #     x[:, 1].astype(np.float32),
+    #     x[:, 2].astype(np.float32),
+    # )
+    # plt.show()
 
     # exit()
     Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
@@ -949,19 +991,19 @@ if __name__ == "__main__":
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
         OPTIMIZER=torch.optim.Adam,
     )
-    runmodel.fit(
-        Q_func=Q_Function,
-        Q_net=QNet,
-        optimizer=Adam,
-        lr_scheduler=ExponentialLR,
-        NR_EPISODES=2001,
-        MIN_EPSILON=0.7,
-        EPSILON_DECAY_RATE=6e-4,
-        N_STEP_QL=1,
-        BATCH_SIZE=16,
-        GAMMA=0.7,
-    )
-    runmodel.plotMetrics()
+    # runmodel.fit(
+    #     Q_func=Q_Function,
+    #     Q_net=QNet,
+    #     optimizer=Adam,
+    #     lr_scheduler=ExponentialLR,
+    #     NR_EPISODES=2001,
+    #     MIN_EPSILON=0.7,
+    #     EPSILON_DECAY_RATE=6e-4,
+    #     N_STEP_QL=1,
+    #     BATCH_SIZE=16,
+    #     GAMMA=0.7,
+    # )
+    # runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     samples = [
@@ -982,10 +1024,10 @@ if __name__ == "__main__":
         "2799764",
     ]
     sampleReqs = [40, 12, 70, 65, 13, 123, 58, 47, 30, 31, 55, 723, 64, 21, 84]
-    runmodel.getBestOder(
-        sampleReqs=sampleReqs, samples=samples, validate=True, plot=True, numCarts=3
-    )
+    # runmodel.getBestOder(
+    #     sampleReqs=sampleReqs, samples=samples, validate=True, plot=True, numCarts=3
+    # )
     # exit()
     for i in range(5):
-        samples = runmodel.getRandomSample(15)
+        samples = runmodel.getRandomSample(5)
         runmodel.getBestOder(samples=samples, plot=True, numCarts=3)
