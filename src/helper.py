@@ -116,23 +116,27 @@ class UtilFunctions:
 
         for i in range(len(solution) - 1):
             idx1, idx2 = solution[i], solution[i + 1]
-            if idx2 == None:
-                for x in range(W.shape[0]):
-                    if x in solution:
-                        continue
-                    else:
-                        idx2 = x
-                        solution[i + 1] = x
-            x = W[idx1, idx2]
-            # total_dist += W[idx1, idx2].item()
+            # if idx2 == None:
+            #     for x in range(W.shape[0]):
+            #         if x in solution:
+            #             continue
+            #         else:
+            #             idx2 = x
+            #             solution[i + 1] = x
+            # x = W[idx1, idx2]
+            total_dist += W[idx1, idx2].item()
             # REPLACE CONSTANT WITH FRACTION FOR PROGRAM CHANGES
             # ADD REMAINDER TO GROUP CALCULATION
-            l2 = len(list(set(self.coords[idx1, 3]) & set(self.coords[idx2, 3])))
-            l1 = len(self.coords[solution[i], 3])
+            overlapComponents = list(
+                set(self.coords[idx1, 4]) & set(self.coords[idx2, 3])
+            )
+            l1 = self.coords[solution[i], 4]
+            total_dist += self.coords[solution[i], 1]
+            total_dist -= Cartsetup(overlapComponents)
             # total_dist = total_dist * (l2 / l1)
-            total_dist += l2 / l1
-            SETUPMINUTES = 10
-            # total_dist += 1200  # 60 * SETUPMINUTES
+            # total_dist += l2 / l1
+            SETUPMINUTES = 20
+            total_dist += 60 * SETUPMINUTES
 
         if len(solution) == W.shape[0]:
             total_dist += W[solution[-1], solution[0]].item()
