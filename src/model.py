@@ -11,7 +11,7 @@ class QNetModel(nn.Module):
         self.emb_dim = emb_dim
         self.T = T
 
-        self.node_dim = 5
+        self.node_dim = 6
 
         self.device = device
 
