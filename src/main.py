@@ -149,6 +149,7 @@ class RunModel:
             os.getcwd() + os.path.normpath(f"/tensorboard/{self.run_name}")
         )
         coords, W_np, _ = self.getData()
+
         W = torch.tensor(
             W_np, dtype=torch.float32, requires_grad=False, device=self.device
         )
@@ -339,6 +340,7 @@ class RunModel:
             return l2 / l1
 
         globalList = {}
+        currentDict = []
         if samples:
             sampleSize = samples
         else:
@@ -347,24 +349,27 @@ class RunModel:
             currentList = sampleSize.copy()
             currentList.remove(i)
             # currentDict = [[self.products[i]["len"] / 1000, 1]]
-            currentDict = [
+            currentDict.append(
                 [
-                    self.products[i]["len"],
-                    len(self.products[i]["comps"]),
-                    i,
-                    self.products[i]["comps"],
+                    float(self.products[i]["len"]),
                     self.products[i]["time"],
+                    1.0,
+                    i,
+                    "comps",  # self.products[i]["comps"],
+                    float(len(self.products[i]["comps"])),
                     random.randint(1, 50),
                 ]
-            ]
+            )
             for j in currentList:
+                overlap = compare(self.products[i]["comps"], self.products[j]["comps"])
                 currentDict.append(
                     [
-                        self.products[j]["len"],
-                        len(self.products[j]["comps"]),
-                        j,
-                        self.products[j]["comps"],
+                        float(self.products[j]["len"]),
                         self.products[j]["time"],
+                        overlap,
+                        j,
+                        "comps",  # self.products[j]["comps"],
+                        float(len(self.products[j]["comps"])),
                         random.randint(1, 50),
                     ]
                 )
@@ -377,11 +382,16 @@ class RunModel:
         else:
             coords = globalList[key]
             product = key
+        coords = currentDict
         for i in coords:
             npArray.append(i)
 
-        coords = np.asarray(npArray, dtype=object)
-        W_np = self.distance_matrix(coords)
+        coords = np.asarray(coords, dtype=object)
+        # test = coords[:, :3].astype(np.float32)
+        W_np = distance_matrix(
+            coords[:, :2].astype(np.float32), coords[:, :2].astype(np.float32)
+        )
+        test = self.distance_matrix(coords)
         return coords, W_np, product
 
     def createValidateData(
@@ -464,8 +474,8 @@ class RunModel:
             numComps = coords[i][1]
             product = coords[i][2]
             components = coords[i][3]
-            assemblyTime = coords[i][4]
-            productRequirement = coords[i][5]
+            assemblyTime = coords[i][5]
+            productRequirement = coords[i][6]
             setupTime = Cartsetup(components)
             assemblyTime = assemblyTime * productRequirement
             for j in range(len(coords)):
@@ -473,8 +483,8 @@ class RunModel:
                 numCompsNext = coords[j][1]
                 productNext = coords[j][2]
                 componentsNext = coords[j][3]
-                assemblyTimeNext = coords[j][4]
-                productRequirementNext = coords[j][5]
+                assemblyTimeNext = coords[j][5]
+                productRequirementNext = coords[j][6]
                 setupTimeNext = Cartsetup(componentsNext)
                 assemblyTimeNext = assemblyTimeNext * productRequirementNext
 
@@ -922,18 +932,22 @@ if __name__ == "__main__":
     START_TIME = time.perf_counter()
     EMBEDDING_DIMENSIONS = 40
     EMBEDDING_ITERATIONS_T = 10
-    runmodel = RunModel(numSamples=40, tuning=True)
+    runmodel = RunModel(numSamples=5, tuning=True)
     # coords, w_np, product = runmodel.getData()
     # runmodel.plot_graph(coords)
     # print(coords[:, :2], coords.shape)
     # coords, _ = runmodel.get_graph_mat(20)
     # print(coords, coords.shape)
     # exit()
+
+    # x, y, _ = runmodel.getData()
+    # print(y)
+
+    # exit()
     Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
-        INIT_LR=0.07,
         EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
-        OPTIMIZER=torch.optim.SGD,
+        OPTIMIZER=torch.optim.Adam,
     )
     runmodel.fit(
         Q_func=Q_Function,
@@ -941,11 +955,11 @@ if __name__ == "__main__":
         optimizer=Adam,
         lr_scheduler=ExponentialLR,
         NR_EPISODES=2001,
-        MIN_EPSILON=0.2,
+        MIN_EPSILON=0.7,
         EPSILON_DECAY_RATE=6e-4,
-        N_STEP_QL=8,
+        N_STEP_QL=1,
         BATCH_SIZE=16,
-        GAMMA=0.5,
+        GAMMA=0.7,
     )
     runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME

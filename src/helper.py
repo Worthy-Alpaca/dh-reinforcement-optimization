@@ -15,7 +15,7 @@ class QFunction:
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.loss_fn = nn.L1Loss()
+        self.loss_fn = nn.MSELoss()
         self.device = device
 
     def predict(self, state_tsr, W):
@@ -25,9 +25,18 @@ class QFunction:
 
     def get_best_action(self, state_tsr, state):
         W = state.W
-        estimated_rewards = self.predict(state_tsr, W)  # size (nr_nodes,)
-        sorted_reward_idx = estimated_rewards.argsort(descending=True)
+        if torch.any(torch.isnan(W)):
+            print()
+        if torch.any(torch.isnan(state_tsr)):
+            print()
 
+        estimated_rewards = self.predict(state_tsr, W)  # size (nr_nodes,)
+
+        if torch.any(torch.isnan(estimated_rewards)):
+            print()
+            estimated_rewards = torch.nan_to_num(estimated_rewards)
+            print()
+        sorted_reward_idx = estimated_rewards.argsort(descending=True)
         solution = state.partial_solution
 
         already_in = set(solution)
@@ -60,10 +69,12 @@ class QFunction:
             estimated_rewards, torch.tensor(targets, device=self.device)
         )
         loss_val = loss.item()
-
+        if torch.any(torch.isnan(loss)):
+            print()
         loss.backward()
         self.optimizer.step()
         self.lr_scheduler.step()
+        # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
 
         return loss_val
 
@@ -113,11 +124,15 @@ class UtilFunctions:
                         idx2 = x
                         solution[i + 1] = x
             x = W[idx1, idx2]
-            total_dist += W[idx1, idx2].item()
+            # total_dist += W[idx1, idx2].item()
             # REPLACE CONSTANT WITH FRACTION FOR PROGRAM CHANGES
             # ADD REMAINDER TO GROUP CALCULATION
+            l2 = len(list(set(self.coords[idx1, 3]) & set(self.coords[idx2, 3])))
+            l1 = len(self.coords[solution[i], 3])
+            # total_dist = total_dist * (l2 / l1)
+            total_dist += l2 / l1
             SETUPMINUTES = 10
-            total_dist += 1200  # 60 * SETUPMINUTES
+            # total_dist += 1200  # 60 * SETUPMINUTES
 
         if len(solution) == W.shape[0]:
             total_dist += W[solution[-1], solution[0]].item()
