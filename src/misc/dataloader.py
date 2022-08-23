@@ -182,10 +182,16 @@ class DataBaseLoader:
             tableName = f"{product}_placementData"
             self.data = pd.read_sql_table(tableName, connection)
             self.data["X"] = (
-                self.data["X"].replace({",": "."}, regex=True).astype(float)
+                self.data["X"]
+                .replace({"\D+": ""}, regex=True)
+                .replace({",": "."}, regex=True)
+                .astype(float)
             )
             self.data["Y"] = (
-                self.data["Y"].replace({",": "."}, regex=True).astype(float)
+                self.data["Y"]
+                .replace({"\D+": ""}, regex=True)
+                .replace({",": "."}, regex=True)
+                .astype(float)
             )
             self.components = self.data["Code"].unique()
 
