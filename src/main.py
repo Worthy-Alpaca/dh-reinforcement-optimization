@@ -335,7 +335,7 @@ class RunModel:
             xv, dtype=torch.float32, requires_grad=False, device=self.device
         )
 
-    def getRandomSample(self, size: int):
+    def getRandomSample(self, size: int, notAllowed: list = False):
         """Method to retrieve a random sample based on the given size.
 
         Args:
@@ -344,13 +344,33 @@ class RunModel:
         Returns:
             list: The generated sample.
         """
+        allowed = list(self.products.keys()).copy()
+        if notAllowed:
+            _ = [allowed.remove(item) for item in notAllowed if item in allowed]
         listkeys = np.random.choice(
-            len(self.products.keys()), size=size, replace=self.allowDuplicates
+            len(allowed), size=size, replace=self.allowDuplicates
         )
 
-        return [list(self.products.keys())[x] for x in listkeys]
+        return [list(allowed)[x] for x in listkeys]
 
-    def getData(self, key: bool = False, samples: list = False):
+    def get_duplicates(self, iterable: list):
+        proofingDict = {}
+        for el in iterable:
+            try:
+                proofingDict[el] += 1
+            except:
+                proofingDict[el] = 1
+        duplicates = []
+        occurances = []
+        for key in proofingDict.keys():
+            for i in range(proofingDict[key] - 1):
+                duplicates.append(key)
+                occurances.append(iterable.count(key))
+        return duplicates, occurances
+
+    def getData(
+        self, key: bool = False, samples: list = False, sampleReqsList: list = False
+    ):
         """Method to get a data sample.
 
         Args:
@@ -363,50 +383,76 @@ class RunModel:
             l1 = len(p1)
             return l2 / l1
 
-        globalList = {}
-        currentDict = []
         if samples:
             sampleSize = samples
         else:
             sampleSize = self.getRandomSample(self.numSamples)
-        for i in sampleSize:
-            currentList = sampleSize.copy()
-            currentList.remove(i)
-            # currentDict = [[self.products[i]["len"] / 1000, 1]]
-            currentDict.append(
-                [
-                    (float(self.products[i]["len"])),
-                    (self.products[i]["time"]),
-                    (self.products[i]["score"]),
-                    i,
-                    self.products[i]["comps"],
-                    float(len(self.products[i]["comps"])),
-                    random.randint(1, 50),
-                ]
-            )
-            # for j in currentList:
-            #     overlap = compare(self.products[i]["comps"], self.products[j]["comps"])
-            #     currentDict.append(
-            #         [
-            #             math.log(float(self.products[j]["len"])),
-            #             math.log(self.products[j]["time"]),
-            #             math.log(self.products[j]["score"]),
-            #             j,
-            #             "comps",  # self.products[j]["comps"],
-            #             float(len(self.products[j]["comps"])),
-            #             random.randint(1, 50),
-            #         ]
-            #     )
-            if i in globalList:
-                i = i + "'"
-            globalList[i] = currentDict
-        npArray = []
-        if key == False:
-            product, coords = random.choice(list(globalList.items()))
+
+        if sampleReqsList:
+            sampleReqs = sampleReqsList
         else:
-            coords = globalList[key]
-            product = key
-        # coords = currentDict
+            sampleReqs = np.random.randint(1, 70, size=(len(sampleSize))).tolist()
+
+        currentDuplicates, occurances = self.get_duplicates(sampleSize)
+        for x in currentDuplicates:
+            lettersIndexes = [i for i in range(len(sampleSize)) if sampleSize[i] == x]
+            runningReqs = 0
+            for i in lettersIndexes:
+                runningReqs += sampleReqs[i]
+            lettersIndexes.reverse()
+            for i in lettersIndexes:
+                del sampleReqs[i]
+                del sampleSize[i]
+            lettersIndexes.reverse()
+            sampleReqs.insert(lettersIndexes[0], runningReqs)
+            sampleSize.insert(lettersIndexes[0], x)
+        # sampleSize = list(set(sampleSize))
+        def createCoords(sampleSize):
+
+            globalList = {}
+            currentDict = []
+            for i in sampleSize:
+                currentList = sampleSize.copy()
+                currentList.remove(i)
+                try:
+                    req = sampleReqs[sampleSize.index(i)]
+                except:
+                    req = np.random.randint(1, 70)
+                    print()
+                currentDict.append(
+                    [
+                        math.log(float(self.products[i]["len"]))
+                        if float(self.products[i]["len"]) != 0
+                        else 0,
+                        math.log(self.products[i]["time"])
+                        if self.products[i]["time"] != 0
+                        else 0,
+                        math.log(self.products[i]["score"])
+                        if self.products[i]["score"] != 0
+                        else 0,
+                        i,
+                        self.products[i]["comps"],
+                        float(len(self.products[i]["comps"])),
+                        req,
+                    ]
+                )
+
+                globalList[i] = currentDict
+            return globalList
+
+        globalList = createCoords(sampleSize)
+        npArray = []
+
+        if len(globalList) < self.numSamples:
+            supplement = self.getRandomSample(
+                self.numSamples - len(globalList), sampleSize
+            )
+            supplement = supplement + sampleSize
+            globalList = createCoords(supplement)
+            # globalList = dict(globalList, **supplement)
+
+        product, coords = random.choice(list(globalList.items()))
+
         for i in coords:
             npArray.append(i)
 
@@ -416,6 +462,8 @@ class RunModel:
             coords[:, :3].astype(np.float32), coords[:, :3].astype(np.float32)
         )
         # test = self.distance_matrix(coords)
+        if W_np.shape != (self.numSamples, self.numSamples):
+            print()
         return coords, W_np, product
 
     def createValidateData(
@@ -445,27 +493,27 @@ class RunModel:
             currentList.remove(i)
             currentDict = [
                 [
-                    math.log(float(self.products[i]["len"])),
-                    math.log(self.products[i]["time"]),
-                    math.log(self.products[i]["score"]),
+                    (float(self.products[i]["len"])),
+                    (self.products[i]["time"]),
+                    (self.products[i]["score"]),
                     i,
                     "comps",  # self.products[i]["comps"],
                     float(len(self.products[i]["comps"])),
                     sampleReqs[samples.index(i)],
                 ]
             ]
-            for j in currentList:
-                currentDict.append(
-                    [
-                        math.log(float(self.products[j]["len"])),
-                        math.log(self.products[j]["time"]),
-                        math.log(self.products[j]["score"]),
-                        j,
-                        "comps",  # self.products[j]["comps"],
-                        float(len(self.products[j]["comps"])),
-                        sampleReqs[samples.index(j)],
-                    ]
-                )
+            # for j in currentList:
+            #     currentDict.append(
+            #         [
+            #             math.log(float(self.products[j]["len"])),
+            #             math.log(self.products[j]["time"]),
+            #             math.log(self.products[j]["score"]),
+            #             j,
+            #             "comps",  # self.products[j]["comps"],
+            #             float(len(self.products[j]["comps"])),
+            #             sampleReqs[samples.index(j)],
+            #         ]
+            #     )
             if i in globalList:
                 i = i + "'"
             globalList[i] = currentDict
@@ -794,13 +842,7 @@ class RunModel:
         best_value = float("inf")
 
         # for i in samples:
-        if validate and sampleReqs != False:
-            coords, W_np, _ = self.createValidateData(
-                samples=samples,
-                sampleReqs=sampleReqs,  # key=i
-            )
-        else:
-            coords, W_np, _ = self.getData(samples=samples)
+        coords, W_np, _ = self.getData(samples=samples, sampleReqsList=sampleReqs)
         self.helper = UtilFunctions(coords)
         # plot_graph(coords, 1)
         # plt.show()
@@ -963,7 +1005,7 @@ if __name__ == "__main__":
     START_TIME = time.perf_counter()
     EMBEDDING_DIMENSIONS = 40
     EMBEDDING_ITERATIONS_T = 10
-    runmodel = RunModel(numSamples=5, tuning=False)
+    runmodel = RunModel(numSamples=25, tuning=True, allowDuplicates=True)
     # coords, w_np, product = runmodel.getData()
     # runmodel.plot_graph(coords)
     # print(coords[:, :2], coords.shape)
@@ -986,47 +1028,49 @@ if __name__ == "__main__":
     # plt.show()
 
     # exit()
+
     Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
         EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
         EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
         OPTIMIZER=torch.optim.Adam,
+        INIT_LR=0.006,
     )
-    # runmodel.fit(
-    #     Q_func=Q_Function,
-    #     Q_net=QNet,
-    #     optimizer=Adam,
-    #     lr_scheduler=ExponentialLR,
-    #     NR_EPISODES=2001,
-    #     MIN_EPSILON=0.7,
-    #     EPSILON_DECAY_RATE=6e-4,
-    #     N_STEP_QL=1,
-    #     BATCH_SIZE=16,
-    #     GAMMA=0.7,
-    # )
-    # runmodel.plotMetrics()
+
+    runmodel.fit(
+        Q_func=Q_Function,
+        Q_net=QNet,
+        optimizer=Adam,
+        lr_scheduler=ExponentialLR,
+        NR_EPISODES=3001,
+        MIN_EPSILON=0.7,
+        EPSILON_DECAY_RATE=6e-4,
+        N_STEP_QL=4,
+        BATCH_SIZE=16,
+        GAMMA=0.7,
+    )
+    runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     samples = [
-        "3010222",
-        "2799760",
-        "2696051",
-        "2696118",
-        "2696155",
-        "2489800",
-        "2196820",
-        "3010733",
-        "2696086",
-        "3010222",
-        "2696036",
-        "2799762",
-        "2495850",
-        "2799752",
-        "2799764",
+        "30.102.22",
+        "27.997.60",
+        "26.961.18",
+        "26.961.55",
+        "24.898.00",
+        "30.107.33",
+        "26.960.86",
+        "30.102.22",
+        "26.960.36",
+        "27.997.62",
+        "27.997.52",
+        "27.997.64",
     ]
-    sampleReqs = [40, 12, 70, 65, 13, 123, 58, 47, 30, 31, 55, 723, 64, 21, 84]
-    # runmodel.getBestOder(
-    #     sampleReqs=sampleReqs, samples=samples, validate=True, plot=True, numCarts=3
-    # )
+
+    sampleReqs = [300, 12, 70, 123, 58, 47, 31, 300, 8, 64, 21, 84]
+
+    runmodel.getBestOder(
+        sampleReqs=sampleReqs, samples=samples, validate=True, plot=True, numCarts=3
+    )
     # exit()
     for i in range(5):
         samples = runmodel.getRandomSample(5)
