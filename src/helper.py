@@ -15,7 +15,7 @@ class QFunction:
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.loss_fn = nn.MSELoss()
+        self.loss_fn = nn.L1Loss()
         self.device = device
 
     def predict(self, state_tsr, W):
@@ -44,7 +44,7 @@ class QFunction:
         for idx in sorted_reward_idx_list:
             x = W[solution[-1], idx]
             if (
-                len(solution) == 0 or W[solution[-1], idx] > 0
+                len(solution) == 0 or W[solution[-1], idx] >= 0
             ) and idx not in already_in:
                 return idx, estimated_rewards[idx].item()
         # print("here get best action")
