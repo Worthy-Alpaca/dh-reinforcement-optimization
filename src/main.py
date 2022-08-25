@@ -71,6 +71,7 @@ class RunModel:
         self.allowDuplicates = allowDuplicates
         self.model = DeployModel(Path(os.getcwd() + os.path.normpath("/FINAL MODEL")))
         self.engine = create_engine("sqlite:///products.db")
+        self.training = True
         dbData = self.engine.execute("SELECT * FROM 'products'").fetchall()
         prodData = []
         for i in dbData:
@@ -219,7 +220,7 @@ class RunModel:
             fname,
         )
 
-    def plot_solution(self, coords: np.ndarray, solution: list):
+    def plot_solution(self, coords: np.ndarray, solution: list, validate=False):
         """Method to plot the given coordinates according to the give solution.
 
         Args:
@@ -228,19 +229,26 @@ class RunModel:
         """
 
         labels = coords[:, 3:4]
-        labels = labels[:, 0]
+        labels = labels[:, 0].tolist()
 
         solutionList = []
         for x in solution:
             solutionList.append(coords[x][3:4][0])
 
-        # solutionList = self.calcGroups(solutionList)
+        if not validate:
+            solutionList = self.calcGroups(solutionList)
         SETUPMINUTES = 10
         # groupTimings = len(solutionList) * SETUPMINUTES * 60
         groupTimings = 0
         textstr = f"{len(solutionList)} Groups\n"
+        testArr = []
         for x in solutionList:
             textstr += f"{x}\n"
+            runningArr = []
+            if not validate:
+                for i in x:
+                    runningArr.append(labels.index(i))
+                testArr.append(runningArr)
 
         coords = coords[:, :3].astype(np.float32)
         fig = plt.figure()
@@ -427,11 +435,11 @@ class RunModel:
                     simTime = simTime / 100
                 currentDict.append(
                     [
-                        (float(self.products[i]["len"]))
+                        math.log(float(self.products[i]["len"])) / 10
                         if float(self.products[i]["len"]) != 0
                         else 0,
-                        simTime,
-                        (self.products[i]["score"])
+                        math.log(simTime) / 10,
+                        math.log(self.products[i]["score"]) / 10
                         if self.products[i]["score"] != 0
                         else 0,
                         i,
@@ -688,6 +696,7 @@ class RunModel:
                         batch_states_tsrs, batch_Ws, batch_actions, batch_targets
                     )
                     self.losses.append(loss)
+                    self.writer.add_scalar("Loss", loss, t)
 
                     med_length = np.median(self.path_lengths[-100:])
                     if med_length < current_min_med_length:
@@ -698,6 +707,8 @@ class RunModel:
 
             length, solution = self.helper.total_distance(solution, W)
             self.path_lengths.append(length)
+            self.writer.add_scalar("Pathlength", length, episode)
+            self.__createTensorboardLogs(Q_net, episode)
 
             if episode % 10 == 0:
                 print(
@@ -716,6 +727,18 @@ class RunModel:
                     coords.copy(),
                     [n for n in solution],
                 )
+        self.plotMetrics()
+
+    def __createTensorboardLogs(self, model: nn.Module, epoch):
+        for name, module in model.named_children():
+            try:
+                self.writer.add_histogram(f"{name}.bias", module.bias, epoch)
+                self.writer.add_histogram(f"{name}.weight", module.weight, epoch)
+                self.writer.add_histogram(
+                    f"{name}.weight.grad", module.weight.grad, epoch
+                )
+            except Exception as e:
+                continue
 
     def plotMetrics(self):
         """Method to plot and visualize saved metrics."""
@@ -824,6 +847,7 @@ class RunModel:
             groupTimings = self.plot_solution(
                 best_solution["coords"],
                 best_solution["solution"],
+                validate=True,
             )
             plt.title(
                 "model / overlap = {}s | Productiontime = {}s".format(
@@ -834,25 +858,46 @@ class RunModel:
                 )
             )
             # plt.figure()
-            lowestSolution = -float("inf")
+            lowestSolution = float("inf")
             lowestRandom = []
             for x in range(10):
-                random_solution = list(range(best_solution["coords"].shape[0]))
+                random_solution = np.random.choice(
+                    best_solution["coords"].shape[0],
+                    size=best_solution["coords"].shape[0],
+                    replace=False,
+                )
+                # random_solution = list(
+                #     random.randint(0, range(best_solution["coords"].shape[0]))
+                #     for x in best_solution["coords"].shape[0]
+                # )
                 runningRandom = self.helper.calc_total_time(
                     random_solution,
                 )[0]
                 # runningRandom = runningRandom**2
-                if runningRandom > lowestSolution:
+                if runningRandom < lowestSolution:
                     lowestSolution = runningRandom
                     lowestRandom = random_solution
 
             groupTimings = self.plot_solution(
                 best_solution["coords"],
                 lowestRandom,
+                validate=True,
             )
             plt.title(
                 "random / overlap = {}s | Productiontime = {}s".format(
                     *self.helper.calc_total_time(lowestRandom)
+                    # + groupTimings
+                )
+            )
+
+            groupTimings = self.plot_solution(
+                best_solution["coords"],
+                range(len(best_solution["coords"])),
+                validate=True,
+            )
+            plt.title(
+                "data / overlap = {}s | Productiontime = {}s".format(
+                    *self.helper.calc_total_time(range(len(best_solution["coords"])))
                     # + groupTimings
                 )
             )
@@ -934,6 +979,11 @@ class RunModel:
                 solutionListRunning.append(product)
                 runningSlots = slotSize
         solutionListReturn.append(solutionListRunning)
+        b = []
+        for lng in range(len(solutionListReturn)):
+            if len(solutionListReturn[lng]) >= 1:
+                b.append(solutionListReturn[lng])
+        solutionListReturn = b
         return solutionListReturn
 
     def plot_graph(self, coords):
@@ -958,9 +1008,9 @@ if __name__ == "__main__":
     np.random.seed(1000)
     torch.manual_seed(1000)
     START_TIME = time.perf_counter()
-    EMBEDDING_DIMENSIONS = 40
-    EMBEDDING_ITERATIONS_T = 10
-    # runmodel = RunModel(numSamples=35, tuning=False, allowDuplicates=True)
+    EMBEDDING_DIMENSIONS = 5
+    EMBEDDING_ITERATIONS_T = 1
+    # runmodel = RunModel(numSamples=10, tuning=False, allowDuplicates=False)
     # coords, w_np, product = runmodel.getData()
     # runmodel.plot_graph(coords)
     # print(coords[:, :2], coords.shape)
@@ -988,7 +1038,6 @@ if __name__ == "__main__":
     #     EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
     #     EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
     #     OPTIMIZER=torch.optim.Adam,
-    #     INIT_LR=0.006,
     # )
 
     # runmodel.fit(
