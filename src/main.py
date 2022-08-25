@@ -10,6 +10,7 @@ from unittest import result
 from matplotlib import pyplot as plt
 from model import QNetModel
 from helper import QFunction
+from validate import Validate
 import numpy as np
 from scipy.spatial import distance_matrix
 from torch.utils.tensorboard import SummaryWriter
@@ -833,158 +834,15 @@ class RunModel:
 
         if self.helper.total_distance(solution, W)[0] < best_value:
             best_value, solution = self.helper.total_distance(solution, W)
-            best_solution = {"W": W, "solution": solution, "coords": coords}
+            best_solution = {
+                "W": W,
+                "solution": solution,
+                "coords": coords,
+                "numCarts": self.numCarts,
+                "products": self.products,
+            }
 
-        if plot:
-            # plt.figure()
-            print(
-                "The best value for this iteration is: ",
-                self.helper.total_distance(
-                    best_solution["solution"], best_solution["W"]
-                )[0],
-            )
-            print(best_solution["coords"][:, :3].astype(np.float32))
-            groupTimings = self.plot_solution(
-                best_solution["coords"],
-                best_solution["solution"],
-                validate=True,
-            )
-            plt.title(
-                "model / overlap = {}s | Productiontime = {}s".format(
-                    *self.helper.calc_total_time(
-                        best_solution["solution"],
-                    )
-                    # + groupTimings
-                )
-            )
-            # plt.figure()
-            lowestSolution = float("inf")
-            lowestRandom = []
-            for x in range(10):
-                random_solution = np.random.choice(
-                    best_solution["coords"].shape[0],
-                    size=best_solution["coords"].shape[0],
-                    replace=False,
-                )
-                # random_solution = list(
-                #     random.randint(0, range(best_solution["coords"].shape[0]))
-                #     for x in best_solution["coords"].shape[0]
-                # )
-                runningRandom = self.helper.calc_total_time(
-                    random_solution,
-                )[0]
-                # runningRandom = runningRandom**2
-                if runningRandom < lowestSolution:
-                    lowestSolution = runningRandom
-                    lowestRandom = random_solution
-
-            groupTimings = self.plot_solution(
-                best_solution["coords"],
-                lowestRandom,
-                validate=True,
-            )
-            plt.title(
-                "random / overlap = {}s | Productiontime = {}s".format(
-                    *self.helper.calc_total_time(lowestRandom)
-                    # + groupTimings
-                )
-            )
-
-            groupTimings = self.plot_solution(
-                best_solution["coords"],
-                range(len(best_solution["coords"])),
-                validate=True,
-            )
-            plt.title(
-                "data / overlap = {}s | Productiontime = {}s".format(
-                    *self.helper.calc_total_time(range(len(best_solution["coords"])))
-                    # + groupTimings
-                )
-            )
-
-            for x in best_solution["solution"]:
-                print(best_solution["coords"][x][:3])
-            plt.show()
         return best_value, best_solution
-
-    def calcSlotSize(self, components) -> int:
-        """Method to calculate the slot size for the given component list.
-
-        Args:
-            components (list): The current component list.
-
-        Returns:
-            int: The cumulative size of the component feeders.
-        """
-        numComponents = 0
-        for i in components:
-            with self.engine.begin() as connection:
-                result = connection.execute(
-                    f"SELECT * FROM 'ReferenceComponents' WHERE Component = '{i}'"
-                ).first()
-                if result == None:
-                    result = {"Feedersize": 8}
-                else:
-                    result = result._asdict()
-                size = result["Feedersize"]
-            if i == "Kreis 1.5mm Bildver" or i == "ATOM":
-                numComponents += 0
-            elif size == "Barcode":
-                numComponents += 40
-            elif size == None:
-                numComponents += 8
-            elif size == "MSF16" or int(size) == 12:
-                numComponents += 16
-            else:
-                numComponents += int(size)
-        return numComponents
-
-    def calcGroups(self, solutionList):
-        """Method to calculate batch queues.
-
-        Args:
-            solutionList (list): The current products according to predicted solution.
-
-        Returns:
-            list: A list containing the batch lists.
-        """
-        maxSlots = 36 * self.numCarts * 8
-        runningSlots = 0
-        solutionListRunning = []
-        solutionListReturn = []
-        for i in range(len(solutionList)):
-            product = solutionList[i]
-            Components = self.products[product]["comps"]
-            try:
-                ComponentsNext = self.products[solutionList[i + 1]]["comps"]
-            except:
-                ComponentsNext = []
-            overlapComponents = list(set(Components) & set(ComponentsNext))
-            x = len(overlapComponents) / len(Components)
-            if len(overlapComponents) / len(Components) < 0.2:
-                solutionListRunning.append(product)
-                solutionListReturn.append(solutionListRunning.copy())
-                solutionListRunning.clear()
-                continue
-            slotSize = self.calcSlotSize(Components)
-            slotSizeOverlap = self.calcSlotSize(overlapComponents)
-            numComponents = slotSize - slotSizeOverlap
-            if numComponents + runningSlots < maxSlots:
-                runningSlots += numComponents
-                solutionListRunning.append(product)
-            else:
-                # runningSlots = 0
-                solutionListReturn.append(solutionListRunning.copy())
-                solutionListRunning.clear()
-                solutionListRunning.append(product)
-                runningSlots = slotSize
-        solutionListReturn.append(solutionListRunning)
-        b = []
-        for lng in range(len(solutionListReturn)):
-            if len(solutionListReturn[lng]) >= 1:
-                b.append(solutionListReturn[lng])
-        solutionListReturn = b
-        return solutionListReturn
 
     def plot_graph(self, coords):
         """Utility function to plot the fully connected graph"""
@@ -1010,36 +868,12 @@ if __name__ == "__main__":
     START_TIME = time.perf_counter()
     EMBEDDING_DIMENSIONS = 5
     EMBEDDING_ITERATIONS_T = 1
-    # runmodel = RunModel(numSamples=10, tuning=False, allowDuplicates=False)
-    # coords, w_np, product = runmodel.getData()
-    # runmodel.plot_graph(coords)
-    # print(coords[:, :2], coords.shape)
-    # coords, _ = runmodel.get_graph_mat(20)
-    # print(coords, coords.shape)
-    # exit()
-    # x, y = runmodel.get_graph_mat(5)
-    # print(x, y.shape)
-
-    # x, y, _ = runmodel.getData()
-    # print(x, y.shape)
-    # fig = plt.figure()
-    # ax = fig.add_subplot(projection="3d")
-
-    # ax.scatter(
-    #     x[:, 0].astype(np.float32),
-    #     x[:, 1].astype(np.float32),
-    #     x[:, 2].astype(np.float32),
-    # )
-    # plt.show()
-
-    # exit()
-
+    # runmodel = RunModel(numSamples=20, tuning=True, allowDuplicates=False)
     # Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
     #     EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
     #     EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
     #     OPTIMIZER=torch.optim.Adam,
     # )
-
     # runmodel.fit(
     #     Q_func=Q_Function,
     #     Q_net=QNet,
@@ -1052,25 +886,9 @@ if __name__ == "__main__":
     #     BATCH_SIZE=16,
     #     GAMMA=0.7,
     # )
-    # runmodel.plotMetrics()
+
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
-    samples = [
-        "30.102.22",
-        "27.997.60",
-        "26.961.18",
-        "26.961.55",
-        "24.898.00",
-        "30.107.33",
-        "26.960.86",
-        "30.102.22",
-        "26.960.36",
-        "27.997.62",
-        "27.997.52",
-        "27.997.64",
-    ]
-
-    sampleReqs = [300, 12, 70, 123, 58, 47, 31, 300, 8, 64, 21, 84]
 
     path = Path(os.getcwd() + os.path.normpath("/2days.xlsx"))
 
@@ -1079,8 +897,8 @@ if __name__ == "__main__":
     samples, sampleReqs = loader()
     runmodel = RunModel(numSamples=len(samples), tuning=False, allowDuplicates=True)
 
-    runmodel.getBestOder(sampleReqs=sampleReqs, samples=samples, plot=True, numCarts=3)
-    # exit()
-    for i in range(5):
-        samples = runmodel.getRandomSample(5)
-        runmodel.getBestOder(samples=samples, plot=True, numCarts=3)
+    best_value, best_solution = runmodel.getBestOder(
+        sampleReqs=sampleReqs, samples=samples, plot=True, numCarts=3
+    )
+    validate = Validate(best_value, best_solution, calcGroups=True)
+    validate.plotSoltions()
