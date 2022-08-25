@@ -108,6 +108,32 @@ class UtilFunctions:
     def is_state_final(self, state):
         return len(set(state.partial_solution)) == state.W.shape[0]
 
+    def calc_total_time(self, solution: list):
+        """Calculates the total time for manufacturing and preparation.
+
+        Args:
+            solution (list): The final solution list.
+
+        Returns:
+            float: The calculated total time.
+        """
+        total_time = 0
+        total_overlap = 0
+        r1 = 0
+        t1 = 0
+        for step in range(len(solution) - 1):
+            # MAYBE ALSO CALCULATE THE OVERLAP TO THE NEXT NEXT PRODUCT
+            idx1, idx2 = solution[step], solution[step + 1]
+            c1 = self.coords[idx1, 4]
+            c2 = self.coords[idx2, 4]
+            overlapComponents = list(set(c1) & set(c2))
+            r1 += Cartsetup(c1)
+            total_overlap += Cartsetup(overlapComponents)
+            t1 += self.coords[idx1, 1] * self.coords[idx1, 6]
+            # total_time += r1 + self.coords[idx1, 1] * self.coords[idx1, 6]
+        total_time = t1 + r1
+        return total_overlap, t1
+
     def total_distance(self, solution: list, W):
         if len(solution) < 2:
             return 0, solution
@@ -124,19 +150,25 @@ class UtilFunctions:
             #             idx2 = x
             #             solution[i + 1] = x
             # x = W[idx1, idx2]
-            total_dist += W[idx1, idx2].item()
+            running_dist = W[idx1, idx2].item()
             # REPLACE CONSTANT WITH FRACTION FOR PROGRAM CHANGES
             # ADD REMAINDER TO GROUP CALCULATION
             overlapComponents = list(
                 set(self.coords[idx1, 4]) & set(self.coords[idx2, 3])
             )
             l1 = self.coords[solution[i], 4]
-            total_dist += self.coords[solution[i], 1]
-            total_dist -= Cartsetup(overlapComponents)
-            # total_dist = total_dist * (l2 / l1)
+            l2 = self.coords[solution[i + 1], 4]
+            # total_dist += self.coords[solution[i], 1]
+            # total_dist -= Cartsetup(overlapComponents)
+            l2 = list(set(l1) & set(l2))
+            overlap = len(l2) / len(l1)
+            if overlap == 0:
+                total_dist += running_dist / 1e-8
+            else:
+                total_dist += running_dist / overlap
             # total_dist += l2 / l1
             SETUPMINUTES = 20
-            total_dist += 60 * SETUPMINUTES
+            # total_dist += 60 * SETUPMINUTES
 
         if len(solution) == W.shape[0]:
             total_dist += W[solution[-1], solution[0]].item()
