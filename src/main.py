@@ -24,6 +24,7 @@ import time
 from tqdm import tqdm
 from datetime import datetime
 from misc.deploy import DeployModel
+import pandas as pd
 
 """PACKAGE_PARENT = "../"
 SCRIPT_DIR = os.path.dirname(
@@ -32,7 +33,7 @@ SCRIPT_DIR = os.path.dirname(
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))"""
 from helper import Memory, UtilFunctions, Cartsetup, Coating
 
-from misc.dataloader import DataLoader, DataBaseLoader
+from misc.dataloader import DataLoader, DataBaseLoader, KappaLoader
 
 # from src.helper.dataloader import DataLoader
 # from helper.deploy import DeployModel
@@ -76,7 +77,6 @@ class RunModel:
             prodData.append(i[0])
 
         # prodData = random.sample(prodData, self.numSamples)
-        print("Generating Data")
         for i in tqdm(prodData):
             product = i
             overallLen = 0
@@ -95,13 +95,13 @@ class RunModel:
                     Ymax = data["Y"].max() * rowOffsets
                     Xmax = data["X"].max() * rowOffsets
                 predArray = np.array(
-                    [len(data) / 2 * rowOffsets, 0 if m == "m10" else 1, Xmax, Ymax]
+                    [len(data) * rowOffsets / 2, 0 if m == "m10" else 1, 0, 0]
                 )
 
                 overallTime += self.model.predict(predArray).item()
             overallTime = overallTime / 2
             overallTime += Coating(Ymax * rowOffsets)
-            overallTime += Cartsetup(components)
+            # overallTime += Cartsetup(components)
             overallLen += len(data) * rowOffsets
 
             allComponents.append(components)
@@ -154,6 +154,7 @@ class RunModel:
         self.writer = SummaryWriter(
             os.getcwd() + os.path.normpath(f"/tensorboard/{self.run_name}")
         )
+
         coords, W_np, _ = self.getData()
 
         W = torch.tensor(
@@ -235,7 +236,8 @@ class RunModel:
 
         # solutionList = self.calcGroups(solutionList)
         SETUPMINUTES = 10
-        groupTimings = len(solutionList) * SETUPMINUTES * 60
+        # groupTimings = len(solutionList) * SETUPMINUTES * 60
+        groupTimings = 0
         textstr = f"{len(solutionList)} Groups\n"
         for x in solutionList:
             textstr += f"{x}\n"
@@ -379,11 +381,14 @@ class RunModel:
         """
 
         def compare(p1, p2):
-            l2 = len(list(set(p1) & set(p2)))
+            l2 = list(set(p1) & set(p2))
             l1 = len(p1)
-            return l2 / l1
+            return l2
 
         if samples:
+            x = compare(self.products, samples)
+            if len(x) != len(samples):
+                print("something")
             sampleSize = samples
         else:
             sampleSize = self.getRandomSample(self.numSamples)
@@ -414,20 +419,19 @@ class RunModel:
             for i in sampleSize:
                 currentList = sampleSize.copy()
                 currentList.remove(i)
-                try:
-                    req = sampleReqs[sampleSize.index(i)]
-                except:
-                    req = np.random.randint(1, 70)
-                    print()
+                req = sampleReqs[sampleSize.index(i)]
+                simTime = (
+                    self.products[i]["time"] if self.products[i]["time"] != 0 else 0
+                )
+                if simTime > 1000:
+                    simTime = simTime / 100
                 currentDict.append(
                     [
-                        math.log(float(self.products[i]["len"]))
+                        (float(self.products[i]["len"]))
                         if float(self.products[i]["len"]) != 0
                         else 0,
-                        math.log(self.products[i]["time"])
-                        if self.products[i]["time"] != 0
-                        else 0,
-                        math.log(self.products[i]["score"])
+                        simTime,
+                        (self.products[i]["score"])
                         if self.products[i]["score"] != 0
                         else 0,
                         i,
@@ -443,7 +447,7 @@ class RunModel:
         globalList = createCoords(sampleSize)
         npArray = []
 
-        if len(globalList) < self.numSamples:
+        if len(globalList) < self.numSamples and self.training:
             supplement = self.getRandomSample(
                 self.numSamples - len(globalList), sampleSize
             )
@@ -462,8 +466,8 @@ class RunModel:
             coords[:, :3].astype(np.float32), coords[:, :3].astype(np.float32)
         )
         # test = self.distance_matrix(coords)
-        if W_np.shape != (self.numSamples, self.numSamples):
-            print()
+        # if W_np.shape != (self.numSamples, self.numSamples):
+        #     print()
         return coords, W_np, product
 
     def distance_matrix(self, coords: np.ndarray):
@@ -548,6 +552,7 @@ class RunModel:
             GAMMA (float): The current gamma value.
         """
         found_solutions = dict()  # episode --> (coords, W, solution)
+        self.training = True
         self.losses = []
         self.path_lengths = []
         current_min_med_length = float("inf")
@@ -734,7 +739,6 @@ class RunModel:
         samples: list,
         plot: bool = False,
         numCarts: int = 6,
-        validate: bool = False,
         sampleReqs: list = False,
     ):
         """Method to predict the best order of the given sample set
@@ -750,6 +754,7 @@ class RunModel:
             tuple: The best value and the best solution.
         """
         self.numCarts = numCarts
+        self.training = False
         all_lengths_fnames = [
             f for f in os.listdir(self.folder_name) if f.endswith(".tar")
         ]
@@ -821,23 +826,34 @@ class RunModel:
                 best_solution["solution"],
             )
             plt.title(
-                "model / runtime = {}s".format(
-                    self.helper.total_distance(
-                        best_solution["solution"], best_solution["W"]
-                    )[0]
-                    + groupTimings
+                "model / overlap = {}s | Productiontime = {}s".format(
+                    *self.helper.calc_total_time(
+                        best_solution["solution"],
+                    )
+                    # + groupTimings
                 )
             )
             # plt.figure()
-            random_solution = list(range(best_solution["coords"].shape[0]))
+            lowestSolution = -float("inf")
+            lowestRandom = []
+            for x in range(10):
+                random_solution = list(range(best_solution["coords"].shape[0]))
+                runningRandom = self.helper.calc_total_time(
+                    random_solution,
+                )[0]
+                # runningRandom = runningRandom**2
+                if runningRandom > lowestSolution:
+                    lowestSolution = runningRandom
+                    lowestRandom = random_solution
+
             groupTimings = self.plot_solution(
                 best_solution["coords"],
-                random_solution,
+                lowestRandom,
             )
             plt.title(
-                "random / runtime = {}s".format(
-                    self.helper.total_distance(random_solution, best_solution["W"])[0]
-                    + groupTimings
+                "random / overlap = {}s | Productiontime = {}s".format(
+                    *self.helper.calc_total_time(lowestRandom)
+                    # + groupTimings
                 )
             )
 
@@ -858,13 +874,13 @@ class RunModel:
         numComponents = 0
         for i in components:
             with self.engine.begin() as connection:
-                result = (
-                    connection.execute(
-                        f"SELECT * FROM 'componentdata' WHERE Component_Code = '{i}'"
-                    )
-                    .first()
-                    ._asdict()
-                )
+                result = connection.execute(
+                    f"SELECT * FROM 'ReferenceComponents' WHERE Component = '{i}'"
+                ).first()
+                if result == None:
+                    result = {"Feedersize": 8}
+                else:
+                    result = result._asdict()
                 size = result["Feedersize"]
             if i == "Kreis 1.5mm Bildver" or i == "ATOM":
                 numComponents += 0
@@ -872,7 +888,7 @@ class RunModel:
                 numComponents += 40
             elif size == None:
                 numComponents += 8
-            elif int(size) == 12:
+            elif size == "MSF16" or int(size) == 12:
                 numComponents += 16
             else:
                 numComponents += int(size)
@@ -899,6 +915,12 @@ class RunModel:
             except:
                 ComponentsNext = []
             overlapComponents = list(set(Components) & set(ComponentsNext))
+            x = len(overlapComponents) / len(Components)
+            if len(overlapComponents) / len(Components) < 0.2:
+                solutionListRunning.append(product)
+                solutionListReturn.append(solutionListRunning.copy())
+                solutionListRunning.clear()
+                continue
             slotSize = self.calcSlotSize(Components)
             slotSizeOverlap = self.calcSlotSize(overlapComponents)
             numComponents = slotSize - slotSizeOverlap
@@ -938,7 +960,7 @@ if __name__ == "__main__":
     START_TIME = time.perf_counter()
     EMBEDDING_DIMENSIONS = 40
     EMBEDDING_ITERATIONS_T = 10
-    runmodel = RunModel(numSamples=25, tuning=True, allowDuplicates=True)
+    # runmodel = RunModel(numSamples=35, tuning=False, allowDuplicates=True)
     # coords, w_np, product = runmodel.getData()
     # runmodel.plot_graph(coords)
     # print(coords[:, :2], coords.shape)
@@ -962,26 +984,26 @@ if __name__ == "__main__":
 
     # exit()
 
-    Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
-        EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
-        EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
-        OPTIMIZER=torch.optim.Adam,
-        INIT_LR=0.006,
-    )
+    # Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
+    #     EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
+    #     EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
+    #     OPTIMIZER=torch.optim.Adam,
+    #     INIT_LR=0.006,
+    # )
 
-    runmodel.fit(
-        Q_func=Q_Function,
-        Q_net=QNet,
-        optimizer=Adam,
-        lr_scheduler=ExponentialLR,
-        NR_EPISODES=3001,
-        MIN_EPSILON=0.7,
-        EPSILON_DECAY_RATE=6e-4,
-        N_STEP_QL=4,
-        BATCH_SIZE=16,
-        GAMMA=0.7,
-    )
-    runmodel.plotMetrics()
+    # runmodel.fit(
+    #     Q_func=Q_Function,
+    #     Q_net=QNet,
+    #     optimizer=Adam,
+    #     lr_scheduler=ExponentialLR,
+    #     NR_EPISODES=3001,
+    #     MIN_EPSILON=0.7,
+    #     EPSILON_DECAY_RATE=6e-4,
+    #     N_STEP_QL=4,
+    #     BATCH_SIZE=16,
+    #     GAMMA=0.7,
+    # )
+    # runmodel.plotMetrics()
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     samples = [
@@ -1001,9 +1023,14 @@ if __name__ == "__main__":
 
     sampleReqs = [300, 12, 70, 123, 58, 47, 31, 300, 8, 64, 21, 84]
 
-    runmodel.getBestOder(
-        sampleReqs=sampleReqs, samples=samples, validate=True, plot=True, numCarts=3
-    )
+    path = Path(os.getcwd() + os.path.normpath("/2days.xlsx"))
+
+    loader = KappaLoader(path)
+
+    samples, sampleReqs = loader()
+    runmodel = RunModel(numSamples=len(samples), tuning=False, allowDuplicates=True)
+
+    runmodel.getBestOder(sampleReqs=sampleReqs, samples=samples, plot=True, numCarts=3)
     # exit()
     for i in range(5):
         samples = runmodel.getRandomSample(5)
