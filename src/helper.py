@@ -15,7 +15,7 @@ class QFunction:
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.loss_fn = nn.L1Loss()
+        self.loss_fn = nn.MSELoss()
         self.device = device
 
     def predict(self, state_tsr, W):
@@ -129,7 +129,7 @@ class UtilFunctions:
             overlapComponents = list(set(c1) & set(c2))
             r1 += Cartsetup(c1)
             total_overlap += Cartsetup(overlapComponents)
-            t1 += self.coords[idx1, 1] * self.coords[idx1, 6]
+            t1 += math.exp(self.coords[idx1, 1] * 10) * self.coords[idx1, 6]
             # total_time += r1 + self.coords[idx1, 1] * self.coords[idx1, 6]
         total_time = t1 + r1
         return total_overlap, t1
@@ -161,9 +161,12 @@ class UtilFunctions:
             # total_dist += self.coords[solution[i], 1]
             # total_dist -= Cartsetup(overlapComponents)
             l2 = list(set(l1) & set(l2))
-            overlap = len(l2) / len(l1)
+            if len(l2) == 0:
+                overlap = 0
+            else:
+                overlap = len(l2) / len(l1)
             if overlap == 0:
-                total_dist += running_dist / 1e-8
+                total_dist += running_dist / 1e-2
             else:
                 total_dist += running_dist / overlap
             # total_dist += l2 / l1
