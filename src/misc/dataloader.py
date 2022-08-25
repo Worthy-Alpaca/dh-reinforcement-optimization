@@ -2,6 +2,7 @@ import os
 import sqlalchemy
 import pandas as pd
 from pathlib import Path
+from sqlalchemy import create_engine
 
 
 class DataLoader:
@@ -228,9 +229,36 @@ class DataBaseLoader:
         return (self.data, self.components, self.offsets, self.score)
 
 
+class KappaLoader:
+    def __init__(self, path: Path) -> None:
+        data = pd.read_excel(path)
+        print(data.info())
+        data = data[["Material", "VerursMenge"]]
+        data = data.dropna(subset=["Material"])
+        self.data = data
+        engine = create_engine("sqlite:///products.db", echo=False)
+        with engine.begin() as con:
+            self.referenceData = pd.read_sql_table("products", con=con)
+            self.referenceData = self.referenceData["product"].tolist()
+
+    def __call__(self):
+        return self.getData()
+
+    def getData(self):
+        print("REMOVING THE FOLLOWING ITEMS FROM LIST DUE TO LACK OF REFERENCE DATA:")
+        print(
+            self.data[~self.data["Material"].isin(self.referenceData)][
+                "Material"
+            ].tolist()
+        )
+        self.data = self.data[self.data["Material"].isin(self.referenceData)]
+        sampleList = self.data["Material"].tolist()
+        sampleReqs = self.data["VerursMenge"].tolist()
+
+        return sampleList, sampleReqs
+
+
 if __name__ == "__main__":
-    path = Path(os.getcwd() + os.path.normpath("/data/24aarab"))
-    dataloader = DataLoader(path, separator=",")
-    data = dataloader()
-    FL = data[1]  # .loc[data[1]['FeedStyle'] == 'ST-FL']
-    FL  # .duplicated()
+    path = Path(os.getcwd() + os.path.normpath("/export.xlsx"))
+    loader = KappaLoader(path)
+    print(loader())
