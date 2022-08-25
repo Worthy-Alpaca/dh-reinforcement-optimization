@@ -5,8 +5,15 @@ from sqlalchemy import create_engine
 
 
 class Validate:
-    def __init__(self, best_value, best_solution, calcGroups: bool = False) -> None:
+    def __init__(
+        self,
+        best_value,
+        best_solution,
+        calcGroups: bool = False,
+        overlapThreshhold: float = 0.5,
+    ) -> None:
         self.best_value = best_value
+        self.overlapThreshhold = overlapThreshhold
         self.solution = best_solution["solution"]
         self.coords = best_solution["coords"]
         self.numCarts = best_solution["numCarts"]
@@ -189,7 +196,7 @@ class Validate:
                 ComponentsNext = []
             overlapComponents = list(set(Components) & set(ComponentsNext))
             x = len(overlapComponents) / len(Components)
-            if len(overlapComponents) / len(Components) < 0.2:
+            if len(overlapComponents) / len(Components) < self.overlapThreshhold:
                 solutionListRunning.append(product)
                 solutionListReturn.append(solutionListRunning.copy())
                 solutionListRunning.clear()
