@@ -15,7 +15,7 @@ class QFunction:
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.loss_fn = nn.MSELoss()
+        self.loss_fn = nn.L1Loss()
         self.device = device
 
     def predict(self, state_tsr, W):
@@ -142,36 +142,22 @@ class UtilFunctions:
 
         for i in range(len(solution) - 1):
             idx1, idx2 = solution[i], solution[i + 1]
-            # if idx2 == None:
-            #     for x in range(W.shape[0]):
-            #         if x in solution:
-            #             continue
-            #         else:
-            #             idx2 = x
-            #             solution[i + 1] = x
-            # x = W[idx1, idx2]
+
             running_dist = W[idx1, idx2].item()
-            # REPLACE CONSTANT WITH FRACTION FOR PROGRAM CHANGES
-            # ADD REMAINDER TO GROUP CALCULATION
-            overlapComponents = list(
-                set(self.coords[idx1, 4]) & set(self.coords[idx2, 3])
-            )
+
             l1 = self.coords[solution[i], 4]
             l2 = self.coords[solution[i + 1], 4]
-            # total_dist += self.coords[solution[i], 1]
-            # total_dist -= Cartsetup(overlapComponents)
             l2 = list(set(l1) & set(l2))
+
             if len(l2) == 0:
                 overlap = 0
             else:
                 overlap = len(l2) / len(l1)
+
             if overlap == 0:
                 total_dist += running_dist / 1e-2
             else:
                 total_dist += running_dist / overlap
-            # total_dist += l2 / l1
-            SETUPMINUTES = 20
-            # total_dist += 60 * SETUPMINUTES
 
         if len(solution) == W.shape[0]:
             total_dist += W[solution[-1], solution[0]].item()
@@ -214,3 +200,15 @@ def Coating(Ymax) -> float:
 
     # highest coordinate on PCB
     return math.sqrt(0**2 + Ymax**2) / velocity
+
+
+class TextRedirector(object):
+    def __init__(self, widget, tag="stdout"):
+        self.widget = widget
+        self.tag = tag
+
+    def write(self, str):
+        self.widget.configure(state="normal")
+        self.widget.insert("end", str, (self.tag,))
+        self.widget.see("end")
+        self.widget.configure(state="disabled")
