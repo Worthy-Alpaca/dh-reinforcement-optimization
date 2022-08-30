@@ -230,13 +230,13 @@ class DataBaseLoader:
 
 
 class KappaLoader:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, dbpath: str) -> None:
         data = pd.read_excel(path)
         print(data.info())
         data = data[["Material", "VerursMenge"]]
         data = data.dropna(subset=["Material"])
         self.data = data
-        engine = create_engine("sqlite:///products.db", echo=False)
+        engine = create_engine(f"sqlite:///{dbpath}")
         with engine.begin() as con:
             self.referenceData = pd.read_sql_table("products", con=con)
             self.referenceData = self.referenceData["product"].tolist()
