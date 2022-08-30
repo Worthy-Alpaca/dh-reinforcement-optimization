@@ -23,7 +23,7 @@ class DeployModel:
         """
         if not os.path.exists(path):
             raise DeplotmentException(
-                "The Model cannot be deployed from the given Path. Make sure that the Path is correct"
+                f"The Model cannot be deployed from the given Path. Make sure that the Path is correct: {path}"
             )
         try:
             self.scaleX: MinMaxScaler = joblib.load(path / "scaleStateX.gz")
