@@ -9,6 +9,7 @@ class Validate:
         self,
         best_value,
         best_solution,
+        dbpath: str,
         calcGroups: bool = False,
         overlapThreshhold: float = 0.5,
     ) -> None:
@@ -23,7 +24,7 @@ class Validate:
         else:
             self.validate = True
         self.helper = UtilFunctions(self.coords)
-        self.engine = create_engine("sqlite:///products.db")
+        self.engine = create_engine(f"sqlite:///{dbpath}")
 
     def plotSoltions(self):
         print("The best value for this iteration is: ", self.best_value)
