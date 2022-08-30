@@ -27,13 +27,9 @@ from helper import TextRedirector
 try:
     from src.modules.gui.parent.canvas import MyCanvas
     from src.modules.gui.controller.controller import Controller
-    from src.modules.gui.backend.machine import Machine
-    from src.modules.gui.backend.network import NetworkRequests
 except:
     from modules.gui.parent.canvas import MyCanvas
     from modules.gui.controller.controller import Controller
-    from modules.gui.backend.machine import Machine
-    from modules.gui.backend.network import NetworkRequests
 
 
 class Interface:
