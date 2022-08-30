@@ -1,4 +1,5 @@
 from collections import namedtuple
+from genericpath import exists
 import math
 import os
 import sys
@@ -42,7 +43,11 @@ from misc.dataloader import DataLoader, DataBaseLoader, KappaLoader
 
 class RunModel:
     def __init__(
-        self, numSamples: int = 10, tuning: bool = False, allowDuplicates: bool = False
+        self,
+        dbpath: str,
+        numSamples: int = 10,
+        tuning: bool = False,
+        allowDuplicates: bool = False,
     ) -> None:
         """Initiate the reinforcement learning model and training or prediction capabilities.
 
@@ -54,7 +59,15 @@ class RunModel:
             self.device = "cuda:0"
         else:
             self.device = "cpu"
-        self.folder_name = "./models"
+
+        try:
+            if exists("./models"):
+                self.folder_name = "./models"
+            else:
+                raise KeyError
+        except:
+            self.folder_name = self.resource_path("src/assets/models")
+
         if tuning:
             if os.path.exists(self.folder_name):
                 shutil.rmtree(self.folder_name)
@@ -70,8 +83,12 @@ class RunModel:
         self.State = namedtuple("State", ("W", "coords", "partial_solution"))
         self.numSamples = numSamples
         self.allowDuplicates = allowDuplicates
-        self.model = DeployModel(Path(os.getcwd() + os.path.normpath("/FINAL MODEL")))
-        self.engine = create_engine("sqlite:///products.db")
+        if exists(os.getcwd() + os.path.normpath("/FINAL MODEL")):
+            modelPath = Path(os.getcwd() + os.path.normpath("/FINAL MODEL"))
+        else:
+            modelPath = Path(self.resource_path("src/assets/final model"))
+        self.model = DeployModel(modelPath)
+        self.engine = create_engine(f"sqlite:///{dbpath}")
         self.training = True
         dbData = self.engine.execute("SELECT * FROM 'products'").fetchall()
         prodData = []
@@ -563,6 +580,7 @@ class RunModel:
         found_solutions = dict()  # episode --> (coords, W, solution)
         self.training = True
         self.losses = []
+        self.lrs = []
         self.path_lengths = []
         current_min_med_length = float("inf")
         for episode in tqdm(range(NR_EPISODES)):
@@ -697,7 +715,11 @@ class RunModel:
                         batch_states_tsrs, batch_Ws, batch_actions, batch_targets
                     )
                     self.losses.append(loss)
+                    self.lrs.append(Q_func.optimizer.param_groups[0]["lr"])
                     self.writer.add_scalar("Loss", loss, t)
+                    self.writer.add_scalar(
+                        "LearningRate", Q_func.optimizer.param_groups[0]["lr"], t
+                    )
 
                     med_length = np.median(self.path_lengths[-100:])
                     if med_length < current_min_med_length:
@@ -750,6 +772,11 @@ class RunModel:
         plt.figure(figsize=(8, 5))
         plt.semilogy(_moving_avg(self.losses, 100))
         plt.ylabel("loss")
+        plt.xlabel("training iteration")
+
+        plt.figure(figsize=(8, 5))
+        plt.semilogy(_moving_avg(self.lrs, 100))
+        plt.ylabel("learning rate")
         plt.xlabel("training iteration")
 
         plt.figure(figsize=(8, 5))
@@ -860,15 +887,23 @@ class RunModel:
                     )
         plt.show()
 
+    def resource_path(self, relative_path):
+        try:
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+
+        return os.path.join(base_path, relative_path)
+
 
 if __name__ == "__main__":
     random.seed(1000)
     np.random.seed(1000)
     torch.manual_seed(1000)
     START_TIME = time.perf_counter()
-    EMBEDDING_DIMENSIONS = 5
-    EMBEDDING_ITERATIONS_T = 1
-    # runmodel = RunModel(numSamples=20, tuning=True, allowDuplicates=False)
+    EMBEDDING_DIMENSIONS = 10
+    EMBEDDING_ITERATIONS_T = 2
+    # runmodel = RunModel(numSamples=13, tuning=True, allowDuplicates=False)
     # Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
     #     EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
     #     EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
@@ -879,7 +914,7 @@ if __name__ == "__main__":
     #     Q_net=QNet,
     #     optimizer=Adam,
     #     lr_scheduler=ExponentialLR,
-    #     NR_EPISODES=3001,
+    #     NR_EPISODES=1501,
     #     MIN_EPSILON=0.7,
     #     EPSILON_DECAY_RATE=6e-4,
     #     N_STEP_QL=4,
@@ -895,10 +930,17 @@ if __name__ == "__main__":
     loader = KappaLoader(path)
 
     samples, sampleReqs = loader()
-    runmodel = RunModel(numSamples=len(samples), tuning=False, allowDuplicates=True)
+    runmodel = RunModel(
+        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
+        numSamples=len(samples),
+        tuning=False,
+        allowDuplicates=True,
+    )
 
     best_value, best_solution = runmodel.getBestOder(
         sampleReqs=sampleReqs, samples=samples, plot=True, numCarts=3
     )
-    validate = Validate(best_value, best_solution, calcGroups=True)
+    validate = Validate(
+        best_value, best_solution, calcGroups=True, overlapThreshhold=0.5
+    )
     validate.plotSoltions()
