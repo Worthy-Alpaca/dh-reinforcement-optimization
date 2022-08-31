@@ -36,23 +36,21 @@ class Interface:
     def __init__(self) -> None:
         """Creates the interface and it's child modules."""
         self.masterframe = tk.Tk()
+        self.style = ttk.Style(self.masterframe)
+        self.style.theme_use("alt")
 
         self.masterframe.protocol("WM_DELETE_WINDOW", self.__onClose)
 
         self.masterframe.title("SMD Produktion")
         self.masterframe.geometry(self.__center_window(self.masterframe, 900, 570))
-        self.masterframe.minsize(width=900, height=570)
+        self.masterframe.minsize(width=1200, height=600)
         self.masterframe.maxsize(width=1200, height=600)
 
-        self.mainframe = tk.Frame(self.masterframe, borderwidth=1, relief=tk.RIDGE)
-        self.mainframe.pack(
-            side="left"
-        )  # grid(row=3, column=0, columnspan=10, rowspan=10)
+        self.mainframe = tk.Frame(self.masterframe, bd=2, relief=tk.RAISED)
+        self.mainframe.pack(side="left")
 
         self.sideframe = tk.Frame(self.masterframe, borderwidth=1, relief=tk.RIDGE)
-        self.sideframe.pack(
-            side="right"
-        )  # grid(row=3, column=11, columnspan=6, rowspan=10)
+        self.sideframe.pack(side="right")
 
         # bind keyboard controlls
         self.mainframe.bind("<Control-x>", self.__onClose)
@@ -61,12 +59,16 @@ class Interface:
         self.mainframe.bind("<F2>", self.__startCompare)
 
         if not exists(
-            os.path.expanduser(os.path.normpath("~/Documents/optimizer/settings"))
+            os.path.expanduser(os.path.normpath("~/Documents/D+H optimizer/settings"))
         ):
             os.makedirs(
-                os.path.expanduser(os.path.normpath("~/Documents/optimizer/settings"))
+                os.path.expanduser(
+                    os.path.normpath("~/Documents/D+H optimizer/settings")
+                )
             )
-        self.basePath = os.path.expanduser(os.path.normpath("~/Documents/optimizer"))
+        self.basePath = os.path.expanduser(
+            os.path.normpath("~/Documents/D+H optimizer")
+        )
 
         # configuring rows
         Grid.rowconfigure(self.mainframe, 0, weight=1)
@@ -84,7 +86,7 @@ class Interface:
         Grid.columnconfigure(self.mainframe, 7, weight=1)
 
         try:
-            photo = PhotoImage(file=self.resource_path("src/assets/logo.png"))
+            photo = PhotoImage(file=self.resource_path("bin/assets/logo.png"))
         except:
             photo = PhotoImage(
                 file=os.getcwd() + os.path.normpath("/src/assets/logo.png")
@@ -185,6 +187,7 @@ class Interface:
                 return self.__findDBPath()
             self.dbpath = os.path.normpath(datapath)
             self.config.set("optimizer_backend", "dbpath", datapath)
+            print("Database file registered successfully.")
 
         button = tk.Button(master=top, text="OK", command=getData)
         button.pack()
@@ -229,7 +232,7 @@ class Interface:
             ) as configfile:
                 self.config.write(configfile)
             self.mainframe.destroy()
-            exit()
+            sys.exit()
 
     def __startThread(self, function: FunctionType, *args):
         """Start a new thread with a given function.
