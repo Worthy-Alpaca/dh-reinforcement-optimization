@@ -161,7 +161,7 @@ class RunModel:
         """
         self.embedding_dimensions = EMBEDDING_DIMENSIONS
         self.embedding_iterations_t = EMBEDDING_ITERATIONS_T
-        Q_net = QNetModel(EMBEDDING_DIMENSIONS, T=EMBEDDING_ITERATIONS_T)
+        Q_net = QNetModel(device=self.device, emb_dim=EMBEDDING_DIMENSIONS, T=EMBEDDING_ITERATIONS_T)
         optimizer = OPTIMIZER(Q_net.parameters(), lr=INIT_LR)
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, gamma=LR_DECAY_RATE
@@ -185,7 +185,7 @@ class RunModel:
         )
         state_tsr = self.state2tens(current_state)
 
-        summary(Q_net, (state_tsr.unsqueeze(0).shape, W.unsqueeze(0).shape))
+        # summary(Q_net, (state_tsr.to('cpu').unsqueeze(0).shape, W.to('cpu').unsqueeze(0).shape))
         # with torch.no_grad():
         #     self.writer.add_graph(Q_net, (state_tsr.unsqueeze(0), W.unsqueeze(0)))
 
@@ -195,7 +195,7 @@ class RunModel:
             optimizer.load_state_dict(checkpoint["optimizer"])
             lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
 
-        Q_func = QFunction(Q_net, optimizer, lr_scheduler)
+        Q_func = QFunction(Q_net, optimizer, lr_scheduler, device=self.device)
         return Q_func, Q_net, optimizer, lr_scheduler
 
     def checkpoint_model(
@@ -935,7 +935,7 @@ if __name__ == "__main__":
         MIN_EPSILON=0.7,
         EPSILON_DECAY_RATE=6e-4,
         N_STEP_QL=4,
-        BATCH_SIZE=16,
+        BATCH_SIZE=32,
         GAMMA=0.7,
     )
 
