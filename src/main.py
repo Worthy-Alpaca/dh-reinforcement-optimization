@@ -66,7 +66,7 @@ class RunModel:
             else:
                 raise KeyError
         except:
-            self.folder_name = self.resource_path("src/assets/models")
+            self.folder_name = self.resource_path("bin/assets/models")
 
         if tuning:
             if os.path.exists(self.folder_name):
@@ -86,7 +86,7 @@ class RunModel:
         if exists(os.getcwd() + os.path.normpath("/FINAL MODEL")):
             modelPath = Path(os.getcwd() + os.path.normpath("/FINAL MODEL"))
         else:
-            modelPath = Path(self.resource_path("src/assets/final model"))
+            modelPath = Path(self.resource_path("bin/assets/final model"))
         self.model = DeployModel(modelPath)
         self.engine = create_engine(f"sqlite:///{dbpath}")
         self.training = True
@@ -903,31 +903,51 @@ if __name__ == "__main__":
     START_TIME = time.perf_counter()
     EMBEDDING_DIMENSIONS = 10
     EMBEDDING_ITERATIONS_T = 2
-    # runmodel = RunModel(numSamples=13, tuning=True, allowDuplicates=False)
-    # Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
-    #     EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
-    #     EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
-    #     OPTIMIZER=torch.optim.Adam,
-    # )
-    # runmodel.fit(
-    #     Q_func=Q_Function,
-    #     Q_net=QNet,
-    #     optimizer=Adam,
-    #     lr_scheduler=ExponentialLR,
-    #     NR_EPISODES=1501,
-    #     MIN_EPSILON=0.7,
-    #     EPSILON_DECAY_RATE=6e-4,
-    #     N_STEP_QL=4,
-    #     BATCH_SIZE=16,
-    #     GAMMA=0.7,
-    # )
+    runmodel = RunModel(
+        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
+        numSamples=13,
+        tuning=False,
+        allowDuplicates=False,
+    )
+
+    all_lengths_fnames = [
+        f for f in os.listdir(runmodel.folder_name) if f.endswith(".tar")
+    ]
+    shortest_fname = sorted(
+        all_lengths_fnames, key=lambda s: float(s.split(".tar")[0].split("_")[-1])
+    )[0]
+    fname = shortest_fname.split("_")
+    emb = int(fname[fname.index("emb") + 1])
+    it = int(fname[fname.index("it") + 1])
+
+    Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
+        fname=os.path.join(runmodel.folder_name, shortest_fname),
+        EMBEDDING_DIMENSIONS=emb,
+        EMBEDDING_ITERATIONS_T=it,
+        OPTIMIZER=torch.optim.Adam,
+    )
+    runmodel.fit(
+        Q_func=Q_Function,
+        Q_net=QNet,
+        optimizer=Adam,
+        lr_scheduler=ExponentialLR,
+        NR_EPISODES=3001,
+        MIN_EPSILON=0.7,
+        EPSILON_DECAY_RATE=6e-4,
+        N_STEP_QL=4,
+        BATCH_SIZE=16,
+        GAMMA=0.7,
+    )
 
     END_TIME = time.perf_counter() - START_TIME
     print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
 
     path = Path(os.getcwd() + os.path.normpath("/2days.xlsx"))
 
-    loader = KappaLoader(path)
+    loader = KappaLoader(
+        path,
+        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
+    )
 
     samples, sampleReqs = loader()
     runmodel = RunModel(
@@ -941,6 +961,10 @@ if __name__ == "__main__":
         sampleReqs=sampleReqs, samples=samples, plot=True, numCarts=3
     )
     validate = Validate(
-        best_value, best_solution, calcGroups=True, overlapThreshhold=0.5
+        best_value,
+        best_solution,
+        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
+        calcGroups=True,
+        overlapThreshhold=0.5,
     )
     validate.plotSoltions()
