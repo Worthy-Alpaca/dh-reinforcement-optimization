@@ -232,7 +232,6 @@ class DataBaseLoader:
 class KappaLoader:
     def __init__(self, path: Path, dbpath: str) -> None:
         data = pd.read_excel(path)
-        print(data.info())
         data = data[["Material", "VerursMenge"]]
         data = data.dropna(subset=["Material"])
         self.data = data
