@@ -44,7 +44,7 @@ class Interface:
         self.masterframe.title("SMD Produktion")
         self.masterframe.geometry(self.__center_window(self.masterframe, 900, 570))
         self.masterframe.minsize(width=1200, height=600)
-        self.masterframe.maxsize(width=1200, height=600)
+        # self.masterframe.maxsize(width=1200, height=600)
 
         self.mainframe = tk.Frame(self.masterframe, bd=2, relief=tk.RAISED)
         self.mainframe.pack(side="left")
@@ -117,7 +117,7 @@ class Interface:
         # Canvas(self.mainframe)
         self.text = tk.Text(self.sideframe, wrap="word")
         self.text.tag_configure("stderr", foreground="#b22222")
-        self.text.grid(row=3, column=0, columnspan=6, rowspan=10)
+        self.text.grid(row=3, column=0, columnspan=10, rowspan=10)
 
         sys.stdout = TextRedirector(self.text, "stdout")
         sys.stderr = TextRedirector(self.text, "stderr")
@@ -437,6 +437,7 @@ class Interface:
             top.grab_release()
             self.calDate[i] = cal.selection_get()
             self.__createLabel(posX, posY, self.calDate[i])
+            print(f'Successfully set {cal.selection_get()} as {i}')
 
         cal.pack(fill="both", expand=True)
         ttk.Button(top, text="ok", command=lambda: getDate(cal)).pack()
