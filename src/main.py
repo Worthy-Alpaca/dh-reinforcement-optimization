@@ -2,11 +2,13 @@ from collections import namedtuple
 from genericpath import exists
 import math
 import os
+from statistics import median
 import sys
 from pathlib import Path
 from types import FunctionType
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 from unittest import result
+import pickle
 
 from matplotlib import pyplot as plt
 from model import QNetModel
@@ -26,7 +28,8 @@ import time
 from tqdm import tqdm
 from datetime import datetime
 from misc.deploy import DeployModel
-import pandas as pd
+from torch.utils.data.dataloader import default_collate
+from torch.profiler import profile, record_function, ProfilerActivity
 
 """PACKAGE_PARENT = "../"
 SCRIPT_DIR = os.path.dirname(
@@ -36,6 +39,7 @@ sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))"""
 from helper import Memory, UtilFunctions, Cartsetup, Coating
 
 from misc.dataloader import DataLoader, DataBaseLoader, KappaLoader
+from misc.dataset import ProductDataloader, ProductDataset
 
 # from src.helper.dataloader import DataLoader
 # from helper.deploy import DeployModel
@@ -48,6 +52,8 @@ class RunModel:
         numSamples: int = 10,
         tuning: bool = False,
         allowDuplicates: bool = False,
+        overwriteDevice: Literal["cpu", 'cuda:0'] = False,
+        caching: bool = True
     ) -> None:
         """Initiate the reinforcement learning model and training or prediction capabilities.
 
@@ -55,10 +61,13 @@ class RunModel:
             numSamples (int, optional): The batch size for training iterations. Defaults to 10.
             tuning (bool, optional): Whether the model is in training mode. Dictates if saved models will be deleted. Defaults to False.
         """
-        if torch.cuda.is_available():
-            self.device = "cuda:0"
+        if not overwriteDevice:
+            if torch.cuda.is_available():
+                self.device = "cuda:0"
+            else:
+                self.device = "cpu"
         else:
-            self.device = "cpu"
+            self.device = overwriteDevice
 
         try:
             if exists("./models"):
@@ -67,6 +76,10 @@ class RunModel:
                 raise KeyError
         except:
             self.folder_name = self.resource_path("bin/assets/models")
+
+        self.basepath = Path(os.path.expanduser(
+            os.path.normpath("~/Documents/D+H optimizer/")
+        ))
 
         if tuning:
             if os.path.exists(self.folder_name):
@@ -91,49 +104,65 @@ class RunModel:
         self.engine = create_engine(f"sqlite:///{dbpath}")
         self.training = True
         dbData = self.engine.execute("SELECT * FROM 'products'").fetchall()
+        masterCompData = self.engine.execute("SELECT * FROM 'allcomponents'").fetchall()
         prodData = []
         for i in dbData:
             prodData.append(i[0])
+        compData = []
+        for i in masterCompData:
+            compData.append(i[0].strip())
 
-        # prodData = random.sample(prodData, self.numSamples)
-        for i in tqdm(prodData):
-            product = i
-            overallLen = 0
-            overallTime = 0
-            allComponents = []
-            for m in ["m10", "m20"]:
+        if exists(self.basepath / 'cache.p') and caching:
+            try:
+                with open(self.basepath / 'cache.p', 'rb') as file:
+                    self.products = pickle.load(file)
+            except Exception as e:
+                raise FileNotFoundError(f'Unable to find: {self.basepath}/cache.p')
+            print('Found cached data.')
+        else:
+            print('No cached data found. Generating new dataset.')
+            for i in tqdm(prodData, disable=True):
+                product = i
+                overallLen = 0
+                overallTime = 0
+                allComponents = []
+                for m in ["m10", "m20"]:
 
-                dataloader = DataBaseLoader(self.engine, i, prodData)
-                data, components, offsets, score = dataloader()
-                rowOffsets = offsets / 2
-                rowOffsets = offsets / rowOffsets
-                if len(data) == 0:
-                    Ymax = 0
-                    Xmax = 0
-                else:
-                    Ymax = data["Y"].max() * rowOffsets
-                    Xmax = data["X"].max() * rowOffsets
-                predArray = np.array(
-                    [len(data) * rowOffsets / 2, 0 if m == "m10" else 1, 0, 0]
-                )
+                    dataloader = DataBaseLoader(self.engine, i, prodData)
+                    data, components, offsets, score = dataloader()
+                    rowOffsets = offsets / 2
+                    rowOffsets = offsets / rowOffsets
+                    if len(data) == 0:
+                        Ymax = 0
+                        Xmax = 0
+                    else:
+                        Ymax = data["Y"].max() * rowOffsets
+                        Xmax = data["X"].max() * rowOffsets
+                    predArray = np.array(
+                        [len(data) * rowOffsets / 2, 0 if m == "m10" else 1, 0, 0]
+                    )
 
-                overallTime += self.model.predict(predArray).item()
-            overallTime = overallTime / 2
-            overallTime += Coating(Ymax * rowOffsets)
-            # overallTime += Cartsetup(components)
-            overallLen += len(data) * rowOffsets
+                    overallTime += self.model.predict(predArray).item()
+                overallTime = overallTime / 2
+                overallTime += Coating(Ymax * rowOffsets)
+                # overallTime += Cartsetup(components)
+                overallLen += len(data) * rowOffsets
 
-            allComponents.append(components)
+                comps = [compData.index(x.strip()) for x in components]
 
-            self.products[product] = {
-                "len": overallLen,
-                "time": overallTime,
-                "score": score,
-                "comps": list(
-                    dict.fromkeys(list(itertools.chain.from_iterable(allComponents)))
-                ),
-            }
-        print("Data generation complete")
+                self.products[product] = {
+                    "len": overallLen,
+                    "time": overallTime,
+                    "score": score,
+                    "comps": comps
+                }
+                
+
+            print("Data generation complete")
+            if caching:
+                with open(self.basepath / "cache.p", "wb") as fp:
+                    print(f"Saving generated data in cache")
+                    pickle.dump(self.products, fp, protocol=pickle.HIGHEST_PROTOCOL)
         if numSamples == -1:
             self.numSamples = len(self.products.keys())
 
@@ -162,6 +191,7 @@ class RunModel:
         self.embedding_dimensions = EMBEDDING_DIMENSIONS
         self.embedding_iterations_t = EMBEDDING_ITERATIONS_T
         Q_net = QNetModel(device=self.device, emb_dim=EMBEDDING_DIMENSIONS, T=EMBEDDING_ITERATIONS_T)
+        Q_net.to(self.device)
         optimizer = OPTIMIZER(Q_net.parameters(), lr=INIT_LR)
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, gamma=LR_DECAY_RATE
@@ -185,7 +215,7 @@ class RunModel:
         )
         state_tsr = self.state2tens(current_state)
 
-        # summary(Q_net, (state_tsr.to('cpu').unsqueeze(0).shape, W.to('cpu').unsqueeze(0).shape))
+        # summary(Q_net, (state_tsr.unsqueeze(0).shape, W.unsqueeze(0).shape))
         # with torch.no_grad():
         #     self.writer.add_graph(Q_net, (state_tsr.unsqueeze(0), W.unsqueeze(0)))
 
@@ -344,7 +374,7 @@ class RunModel:
         sol_first_node = (
             state.partial_solution[0] if len(state.partial_solution) > 0 else -1
         )
-        coords = state.coords[:, :3].astype(np.float32)
+        coords = state.coords
         nr_nodes = coords.shape[0]
 
         xv = [
@@ -413,8 +443,6 @@ class RunModel:
 
         if samples:
             x = compare(self.products, samples)
-            if len(x) != len(samples):
-                print("something")
             sampleSize = samples
         else:
             sampleSize = self.getRandomSample(self.numSamples)
@@ -550,6 +578,47 @@ class RunModel:
         dist_mat = distance_matrix(coords, coords)
         return coords, dist_mat
 
+    def generateData(self,):
+        sampleSize = list(self.products.keys())
+        sampleReqs = np.random.randint(1, 70, size=(len(sampleSize))).tolist()
+        currentDict = []
+        for i in sampleSize:
+            currentList = sampleSize.copy()
+            currentList.remove(i)
+            req = sampleReqs[sampleSize.index(i)]
+            simTime = (
+                self.products[i]["time"] if self.products[i]["time"] != 0 else 0
+            )
+            if simTime > 1000:
+                simTime = simTime / 100
+
+            currentDict.append(
+                [
+                    math.log(float(self.products[i]["len"])) / 10
+                    if float(self.products[i]["len"]) != 0
+                    else 0,
+                    math.log(simTime) / 10,
+                    math.log(self.products[i]["score"]) / 10
+                    if self.products[i]["score"] != 0
+                    else 0,
+                    i,
+                    self.products[i]["comps"],
+                    float(len(self.products[i]["comps"])),
+                    req,
+                ]
+            )
+            del  req, simTime, currentList
+        # self.refData = np.asarray(currentDict)
+        currentDict = np.asarray(currentDict, dtype=object)
+        clist = []
+        for c in currentDict:
+            clist.append(c[4])
+        clist = np.asarray(clist, dtype=object)
+        max_len = np.max([len(a) for a in clist])
+        clist = np.asarray([np.pad(a, (0, max_len - len(a)), 'constant', constant_values=-1) for a in clist], dtype=np.int32)
+        del max_len, sampleReqs, sampleSize
+        return currentDict, clist
+
     def fit(
         self,
         Q_func: FunctionType,
@@ -583,21 +652,24 @@ class RunModel:
         self.lrs = []
         self.path_lengths = []
         current_min_med_length = float("inf")
+        # torch.backends.cudnn.benchmark = True
+        Q_net = Q_net.float()
+        BATCH_SIZE = self.numSamples
+        data, clist = self.generateData()
+        productDataset = ProductDataset(data, clist)
+        productDataloader = ProductDataloader(productDataset, self.numSamples, shuffle=True, num_workers=4, drop_last=True, persistent_workers=True, pin_memory=True)# collate_fn=lambda x: tuple(x_.to(self.device) for x_ in default_collate(x)))
         for episode in tqdm(range(NR_EPISODES)):
-            # sample a new random graph
-            coords, W_np, product = self.getData()
-            self.helper = UtilFunctions(coords)
-            # coords, W_np = self.get_graph_mat(self.numSamples)
-            W = torch.tensor(
-                W_np, dtype=torch.float32, requires_grad=False, device=self.device
-            )
+            coords, W_np, components = next(iter(productDataloader))
+            
+            coords, W, components = coords.to(self.device).float(), torch.tensor(W_np, device=self.device, dtype=torch.float32, requires_grad=False), components.to(self.device)
+            self.helper = UtilFunctions(components)
 
             # current partial solution - a list of node index
             solution = [random.randint(0, coords.shape[0] - 1)]
 
             # current state (tuple and tensor)
             current_state = self.State(
-                partial_solution=solution, W=W, coords=coords[:, :3].astype(np.float32)
+                partial_solution=solution, W=W, coords=coords
             )
             current_state_tsr = self.state2tens(current_state)
 
@@ -606,6 +678,7 @@ class RunModel:
             states_tsrs = [
                 current_state_tsr
             ]  # we also keep the state tensors here (for efficiency)
+            # rewards = torch.zeros(0, device=self.device)
             rewards = []
             actions = []
 
@@ -619,8 +692,6 @@ class RunModel:
                 if epsilon >= random.random():
                     # explore
                     next_node = self.helper.get_next_neighbor_random(current_state)
-                    if next_node == None:
-                        continue
                     nr_explores += 1
                 else:
                     # exploit
@@ -635,22 +706,19 @@ class RunModel:
                                 episode, solution, est_reward
                             )
                         )
-
+                del current_state_tsr, current_state
                 next_solution = solution + [next_node]
 
-                if None in solution or None in next_solution:
-                    print(product)
-                    print("here")
-
                 # reward observed for taking this step
-                rwNext, next_solution = self.helper.total_distance(next_solution, W)
-                rwNow, solution = self.helper.total_distance(solution, W)
-                reward = -(rwNext - rwNow)
+                # rwNext, next_solution = self.helper.total_distance(next_solution, W)
+                # rwNow, solution = self.helper.total_distance(solution, W)
+                # reward = -(rwNext - rwNow)
+                reward = -(self.helper.total_distance(next_solution, W)[0] - self.helper.total_distance(solution, W)[0])
 
                 next_state = self.State(
                     partial_solution=next_solution,
                     W=W,
-                    coords=coords[:, :3].astype(np.float32),
+                    coords=coords,
                 )
                 next_state_tsr = self.state2tens(next_state)
 
@@ -658,7 +726,9 @@ class RunModel:
                 states.append(next_state)
                 states_tsrs.append(next_state_tsr)
                 rewards.append(reward)
+                # rewards = torch.cat((rewards, reward), -1)
                 actions.append(next_node)
+                # actions = torch.cat(actions, next_node)
 
                 # store our experience in memory, using n-step Q-learning:
                 if len(solution) >= N_STEP_QL:
@@ -693,12 +763,13 @@ class RunModel:
 
                 # take a gradient step
                 loss = None
-                if len(self.memory) >= BATCH_SIZE and len(self.memory) >= 2000:
+                if len(self.memory) >= BATCH_SIZE and len(self.memory) >= 200:
                     experiences = self.memory.sample_batch(BATCH_SIZE)
 
                     batch_states_tsrs = [e.state_tsr for e in experiences]
                     batch_Ws = [e.state.W for e in experiences]
                     batch_actions = [e.action for e in experiences]
+                    # batch_targets = torch.zeros(0, device=self.device)
                     batch_targets = []
 
                     for i, experience in enumerate(experiences):
@@ -708,7 +779,9 @@ class RunModel:
                                 experience.next_state_tsr, experience.next_state
                             )
                             target += GAMMA * best_reward
+                        # batch_targets = torch.cat((batch_targets, target), -1)
                         batch_targets.append(target)
+                        del target
 
                     # print("batch targets: {}".format(batch_targets))
                     loss = Q_func.batch_update(
@@ -747,9 +820,10 @@ class RunModel:
                 )
                 found_solutions[episode] = (
                     W.clone(),
-                    coords.copy(),
+                    coords.clone(),
                     [n for n in solution],
                 )
+            # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
         self.plotMetrics()
 
     def __createTensorboardLogs(self, model: nn.Module, epoch):
@@ -832,7 +906,14 @@ class RunModel:
 
         # for i in samples:
         coords, W_np, _ = self.getData(samples=samples, sampleReqsList=sampleReqs)
-        self.helper = UtilFunctions(coords)
+        clist = []
+        for c in coords:
+            clist.append(c[4])
+        max_len = np.max([len(a) for a in clist])
+        
+        components = np.asarray([np.pad(a, (0, max_len - len(a)), 'constant', constant_values=-1) for a in clist], dtype=np.int32)
+        components = torch.from_numpy(components)
+        self.helper = UtilFunctions(components)
         # plot_graph(coords, 1)
         # plt.show()
         # coords, W_np = get_graph_mat(n=NR_NODES)
@@ -865,6 +946,7 @@ class RunModel:
                 "W": W,
                 "solution": solution,
                 "coords": coords,
+                "components": components,
                 "numCarts": self.numCarts,
                 "products": self.products,
             }
@@ -900,30 +982,31 @@ if __name__ == "__main__":
     random.seed(1000)
     np.random.seed(1000)
     torch.manual_seed(1000)
+    torch.multiprocessing.set_start_method('spawn')
     START_TIME = time.perf_counter()
     EMBEDDING_DIMENSIONS = 10
     EMBEDDING_ITERATIONS_T = 2
     runmodel = RunModel(
         dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
-        numSamples=13,
+        numSamples=8,
         tuning=False,
         allowDuplicates=False,
     )
 
-    all_lengths_fnames = [
-        f for f in os.listdir(runmodel.folder_name) if f.endswith(".tar")
-    ]
-    shortest_fname = sorted(
-        all_lengths_fnames, key=lambda s: float(s.split(".tar")[0].split("_")[-1])
-    )[0]
-    fname = shortest_fname.split("_")
-    emb = int(fname[fname.index("emb") + 1])
-    it = int(fname[fname.index("it") + 1])
+    # all_lengths_fnames = [
+    #     f for f in os.listdir(runmodel.folder_name) if f.endswith(".tar")
+    # ]
+    # shortest_fname = sorted(
+    #     all_lengths_fnames, key=lambda s: float(s.split(".tar")[0].split("_")[-1])
+    # )[0]
+    # fname = shortest_fname.split("_")
+    # emb = int(fname[fname.index("emb") + 1])
+    # it = int(fname[fname.index("it") + 1])
 
     Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
-        fname=os.path.join(runmodel.folder_name, shortest_fname),
-        EMBEDDING_DIMENSIONS=emb,
-        EMBEDDING_ITERATIONS_T=it,
+        # fname=os.path.join(runmodel.folder_name, shortest_fname),
+        EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
+        EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
         OPTIMIZER=torch.optim.Adam,
     )
     runmodel.fit(
@@ -931,11 +1014,11 @@ if __name__ == "__main__":
         Q_net=QNet,
         optimizer=Adam,
         lr_scheduler=ExponentialLR,
-        NR_EPISODES=3001,
+        NR_EPISODES=501,
         MIN_EPSILON=0.7,
         EPSILON_DECAY_RATE=6e-4,
         N_STEP_QL=4,
-        BATCH_SIZE=32,
+        BATCH_SIZE=16,
         GAMMA=0.7,
     )
 
