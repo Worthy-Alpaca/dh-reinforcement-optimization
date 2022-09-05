@@ -17,13 +17,14 @@ class Validate:
         self.overlapThreshhold = overlapThreshhold
         self.solution = best_solution["solution"]
         self.coords = best_solution["coords"]
+        self.components = best_solution["components"]
         self.numCarts = best_solution["numCarts"]
         self.products = best_solution["products"]
         if calcGroups:
             self.validate = False
         else:
             self.validate = True
-        self.helper = UtilFunctions(self.coords)
+        self.helper = UtilFunctions(self.components)
         self.engine = create_engine(f"sqlite:///{dbpath}")
 
     def plotSoltions(self):
