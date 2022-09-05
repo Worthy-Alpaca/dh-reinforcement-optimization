@@ -15,7 +15,7 @@ class QFunction:
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.loss_fn = nn.L1Loss()
+        self.loss_fn = nn.HuberLoss()
         self.device = device
 
     def predict(self, state_tsr, W):
@@ -42,7 +42,6 @@ class QFunction:
         already_in = set(solution)
         sorted_reward_idx_list = sorted_reward_idx.tolist()
         for idx in sorted_reward_idx_list:
-            x = W[solution[-1], idx]
             if (
                 len(solution) == 0 or W[solution[-1], idx] >= 0
             ) and idx not in already_in:
@@ -53,7 +52,9 @@ class QFunction:
     def batch_update(self, states_tsrs, Ws, actions, targets):
         Ws_tsr = torch.stack(Ws).to(self.device)
         xv = torch.stack(states_tsrs).to(self.device)
-        self.optimizer.zero_grad()
+        # self.optimizer.zero_grad(set_to_none=True)
+        for param in self.model.parameters():
+            param.grad = None
 
         if None in actions:
             for i in actions:
@@ -117,21 +118,20 @@ class UtilFunctions:
         Returns:
             float: The calculated total time.
         """
-        total_time = 0
         total_overlap = 0
         r1 = 0
         t1 = 0
         for step in range(len(solution) - 1):
             # MAYBE ALSO CALCULATE THE OVERLAP TO THE NEXT NEXT PRODUCT
             idx1, idx2 = solution[step], solution[step + 1]
-            c1 = self.coords[idx1, 4]
-            c2 = self.coords[idx2, 4]
-            overlapComponents = list(set(c1) & set(c2))
+            c1 = self.coords[idx1]
+            c2 = self.coords[idx2]
+            a_cat_b, counts = torch.cat([c1, c2]).unique(return_counts=True)
+            overlapComponents = a_cat_b[torch.where(counts.gt(1))]
             r1 += Cartsetup(c1)
             total_overlap += Cartsetup(overlapComponents)
-            t1 += math.exp(self.coords[idx1, 1] * 10) * self.coords[idx1, 6]
-            # total_time += r1 + self.coords[idx1, 1] * self.coords[idx1, 6]
-        total_time = t1 + r1
+            del c1, c2
+        # total_time = t1 + r1
         return total_overlap, t1
 
     def total_distance(self, solution: list, W):
@@ -145,19 +145,17 @@ class UtilFunctions:
 
             running_dist = W[idx1, idx2].item()
 
-            l1 = self.coords[solution[i], 4]
-            l2 = self.coords[solution[i + 1], 4]
-            l2 = list(set(l1) & set(l2))
+            l1 = self.coords[solution[i]]
+            l2 = self.coords[solution[i + 1]]
+            a_cat_b, counts = torch.cat([l1, l2]).unique(return_counts=True)
+            l2 = a_cat_b[torch.where(counts.gt(1))]
 
-            if len(l2) == 0:
-                overlap = 0
+            if l2.shape[0] == 1 and l2[0].item() == -1:
+                overlap = 1e-2
             else:
-                overlap = len(l2) / len(l1)
-
-            if overlap == 0:
-                total_dist += running_dist / 1e-2
-            else:
-                total_dist += running_dist / overlap
+                overlap = l2.shape[0] / l1.shape[0]
+            del l1, l2
+            total_dist += running_dist / overlap
 
         if len(solution) == W.shape[0]:
             total_dist += W[solution[-1], solution[0]].item()
