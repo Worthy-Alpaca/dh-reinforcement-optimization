@@ -269,8 +269,14 @@ class Interface:
             dbpath=self.config.get("optimizer_backend", "dbpath"),
             numSamples=self.config.getint("default", "trainingSamples"),
         )
+        try:
+            startDate = self.calDate['start']
+            endDate = self.calDate['end']
+        except:
+            startDate = None
+            endDate = None
         loader = KappaLoader(
-            os.path.normpath(datapath), self.config.get("optimizer_backend", "dbpath")
+            os.path.normpath(datapath), self.config.get("optimizer_backend", "dbpath"), startDate, endDate
         )
         samples, sampleReqs = loader.getData()
         best_value, best_solution = runmodel.getBestOder(
@@ -437,7 +443,7 @@ class Interface:
             top.grab_release()
             self.calDate[i] = cal.selection_get()
             self.__createLabel(posX, posY, self.calDate[i])
-            print(f'Successfully set {cal.selection_get()} as {i}')
+            print(f'Successfully set {cal.selection_get()} as {i} Date')
 
         cal.pack(fill="both", expand=True)
         ttk.Button(top, text="ok", command=lambda: getDate(cal)).pack()

@@ -230,9 +230,17 @@ class DataBaseLoader:
 
 
 class KappaLoader:
-    def __init__(self, path: Path, dbpath: str) -> None:
+    def __init__(self, path: Path, dbpath: str, startDate: str = None, endDate: str = None) -> None:
         data = pd.read_excel(path)
-        data = data[["Material", "VerursMenge"]]
+
+        data = data[["Unnamed: 3", "Material", "VerursMenge"]]
+        data['Date'] = pd.to_datetime(data["Unnamed: 3"], errors="coerce")
+        print(data.head())
+        if startDate is not None and endDate is not None:
+            after_start_date = data["Date"] >= pd.to_datetime(startDate)
+            before_end_date = data["Date"] <= pd.to_datetime(endDate)
+            between_two_dates = after_start_date & before_end_date
+            data = data.loc[between_two_dates]
         data = data.dropna(subset=["Material"])
         self.data = data
         engine = create_engine(f"sqlite:///{dbpath}")
