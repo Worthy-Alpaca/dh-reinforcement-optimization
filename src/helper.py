@@ -52,9 +52,9 @@ class QFunction:
     def batch_update(self, states_tsrs, Ws, actions, targets):
         Ws_tsr = torch.stack(Ws).to(self.device)
         xv = torch.stack(states_tsrs).to(self.device)
-        # self.optimizer.zero_grad(set_to_none=True)
-        for param in self.model.parameters():
-            param.grad = None
+        self.optimizer.zero_grad(set_to_none=True)
+        # for param in self.model.parameters():
+        #     param.grad = None
 
         if None in actions:
             for i in actions:
@@ -64,11 +64,12 @@ class QFunction:
                     else:
                         actions[i] = x
 
-        estimated_rewards = self.model(xv, Ws_tsr)[range(len(actions)), actions]
+        with torch.cuda.amp.autocast():
+            estimated_rewards = self.model(xv, Ws_tsr)[range(len(actions)), actions]
 
-        loss = self.loss_fn(
-            estimated_rewards, torch.tensor(targets, device=self.device)
-        )
+            loss = self.loss_fn(
+                estimated_rewards, torch.tensor(targets, device=self.device)
+            )
         loss_val = loss.item()
         if torch.any(torch.isnan(loss)):
             print()
