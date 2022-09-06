@@ -52,8 +52,8 @@ class RunModel:
         numSamples: int = 10,
         tuning: bool = False,
         allowDuplicates: bool = False,
-        overwriteDevice: Literal["cpu", 'cuda:0'] = False,
-        caching: bool = True
+        overwriteDevice: Literal["cpu", "cuda:0"] = False,
+        caching: bool = True,
     ) -> None:
         """Initiate the reinforcement learning model and training or prediction capabilities.
 
@@ -77,9 +77,9 @@ class RunModel:
         except:
             self.folder_name = self.resource_path("bin/assets/models")
 
-        self.basepath = Path(os.path.expanduser(
-            os.path.normpath("~/Documents/D+H optimizer/")
-        ))
+        self.basepath = Path(
+            os.path.expanduser(os.path.normpath("~/Documents/D+H optimizer/"))
+        )
 
         if tuning:
             if os.path.exists(self.folder_name):
@@ -112,15 +112,15 @@ class RunModel:
         for i in masterCompData:
             compData.append(i[0].strip())
 
-        if exists(self.basepath / 'cache.p') and caching:
+        if exists(self.basepath / "cache.p") and caching:
             try:
-                with open(self.basepath / 'cache.p', 'rb') as file:
+                with open(self.basepath / "cache.p", "rb") as file:
                     self.products = pickle.load(file)
             except Exception as e:
-                raise FileNotFoundError(f'Unable to find: {self.basepath}/cache.p')
-            print('Found cached data.')
+                raise FileNotFoundError(f"Unable to find: {self.basepath}/cache.p")
+            print("Found cached data.")
         else:
-            print('No cached data found. Generating new dataset.')
+            print("No cached data found. Generating new dataset.")
             for i in tqdm(prodData, disable=True):
                 product = i
                 overallLen = 0
@@ -154,9 +154,8 @@ class RunModel:
                     "len": overallLen,
                     "time": overallTime,
                     "score": score,
-                    "comps": comps
+                    "comps": comps,
                 }
-                
 
             print("Data generation complete")
             if caching:
@@ -190,7 +189,9 @@ class RunModel:
         """
         self.embedding_dimensions = EMBEDDING_DIMENSIONS
         self.embedding_iterations_t = EMBEDDING_ITERATIONS_T
-        Q_net = QNetModel(device=self.device, emb_dim=EMBEDDING_DIMENSIONS, T=EMBEDDING_ITERATIONS_T)
+        Q_net = QNetModel(
+            device=self.device, emb_dim=EMBEDDING_DIMENSIONS, T=EMBEDDING_ITERATIONS_T
+        )
         Q_net.to(self.device)
         optimizer = OPTIMIZER(Q_net.parameters(), lr=INIT_LR)
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
@@ -578,7 +579,9 @@ class RunModel:
         dist_mat = distance_matrix(coords, coords)
         return coords, dist_mat
 
-    def generateData(self,):
+    def generateData(
+        self,
+    ):
         sampleSize = list(self.products.keys())
         sampleReqs = np.random.randint(1, 70, size=(len(sampleSize))).tolist()
         currentDict = []
@@ -586,9 +589,7 @@ class RunModel:
             currentList = sampleSize.copy()
             currentList.remove(i)
             req = sampleReqs[sampleSize.index(i)]
-            simTime = (
-                self.products[i]["time"] if self.products[i]["time"] != 0 else 0
-            )
+            simTime = self.products[i]["time"] if self.products[i]["time"] != 0 else 0
             if simTime > 1000:
                 simTime = simTime / 100
 
@@ -607,7 +608,7 @@ class RunModel:
                     req,
                 ]
             )
-            del  req, simTime, currentList
+            del req, simTime, currentList
         # self.refData = np.asarray(currentDict)
         currentDict = np.asarray(currentDict, dtype=object)
         clist = []
@@ -615,7 +616,13 @@ class RunModel:
             clist.append(c[4])
         clist = np.asarray(clist, dtype=object)
         max_len = np.max([len(a) for a in clist])
-        clist = np.asarray([np.pad(a, (0, max_len - len(a)), 'constant', constant_values=-1) for a in clist], dtype=np.int32)
+        clist = np.asarray(
+            [
+                np.pad(a, (0, max_len - len(a)), "constant", constant_values=-1)
+                for a in clist
+            ],
+            dtype=np.int32,
+        )
         del max_len, sampleReqs, sampleSize
         return currentDict, clist
 
@@ -657,20 +664,35 @@ class RunModel:
         BATCH_SIZE = self.numSamples
         data, clist = self.generateData()
         productDataset = ProductDataset(data, clist)
-        productDataloader = ProductDataloader(productDataset, self.numSamples, shuffle=True, num_workers=4, drop_last=True, persistent_workers=True, pin_memory=True)# collate_fn=lambda x: tuple(x_.to(self.device) for x_ in default_collate(x)))
+        productDataloader = ProductDataloader(
+            productDataset,
+            self.numSamples,
+            shuffle=True,
+            num_workers=4,
+            drop_last=True,
+            persistent_workers=True,
+            pin_memory=True,
+        )
         for episode in tqdm(range(NR_EPISODES)):
             coords, W_np, components = next(iter(productDataloader))
-            
-            coords, W, components = coords.to(self.device).float(), torch.tensor(W_np, device=self.device, dtype=torch.float32, requires_grad=False), components.to(self.device)
+
+            coords, W, components = (
+                coords.to(self.device, non_blocking=True).float(),
+                torch.tensor(
+                    W_np,
+                    device=self.device,
+                    dtype=torch.float32,
+                    requires_grad=False,
+                ),
+                components.to(self.device, non_blocking=True),
+            )
             self.helper = UtilFunctions(components)
 
             # current partial solution - a list of node index
             solution = [random.randint(0, coords.shape[0] - 1)]
 
             # current state (tuple and tensor)
-            current_state = self.State(
-                partial_solution=solution, W=W, coords=coords
-            )
+            current_state = self.State(partial_solution=solution, W=W, coords=coords)
             current_state_tsr = self.state2tens(current_state)
 
             # Keep track of some variables for insertion in replay memory:
@@ -713,7 +735,10 @@ class RunModel:
                 # rwNext, next_solution = self.helper.total_distance(next_solution, W)
                 # rwNow, solution = self.helper.total_distance(solution, W)
                 # reward = -(rwNext - rwNow)
-                reward = -(self.helper.total_distance(next_solution, W)[0] - self.helper.total_distance(solution, W)[0])
+                reward = -(
+                    self.helper.total_distance(next_solution, W)[0]
+                    - self.helper.total_distance(solution, W)[0]
+                )
 
                 next_state = self.State(
                     partial_solution=next_solution,
@@ -798,7 +823,12 @@ class RunModel:
                     if med_length < current_min_med_length:
                         current_min_med_length = med_length
                         self.checkpoint_model(
-                            Q_net, optimizer, lr_scheduler, loss, episode, med_length
+                            Q_net,
+                            optimizer,
+                            lr_scheduler,
+                            loss,
+                            episode,
+                            med_length,
                         )
 
             length, solution = self.helper.total_distance(solution, W)
@@ -823,6 +853,7 @@ class RunModel:
                     coords.clone(),
                     [n for n in solution],
                 )
+            # prof.step()
             # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
         self.plotMetrics()
 
@@ -910,8 +941,14 @@ class RunModel:
         for c in coords:
             clist.append(c[4])
         max_len = np.max([len(a) for a in clist])
-        
-        components = np.asarray([np.pad(a, (0, max_len - len(a)), 'constant', constant_values=-1) for a in clist], dtype=np.int32)
+
+        components = np.asarray(
+            [
+                np.pad(a, (0, max_len - len(a)), "constant", constant_values=-1)
+                for a in clist
+            ],
+            dtype=np.int32,
+        )
         components = torch.from_numpy(components)
         self.helper = UtilFunctions(components)
         # plot_graph(coords, 1)
@@ -982,13 +1019,13 @@ if __name__ == "__main__":
     random.seed(1000)
     np.random.seed(1000)
     torch.manual_seed(1000)
-    torch.multiprocessing.set_start_method('spawn')
+    torch.multiprocessing.set_start_method("spawn")
     START_TIME = time.perf_counter()
-    EMBEDDING_DIMENSIONS = 10
+    EMBEDDING_DIMENSIONS = 16
     EMBEDDING_ITERATIONS_T = 2
     runmodel = RunModel(
         dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
-        numSamples=8,
+        numSamples=16,
         tuning=False,
         allowDuplicates=False,
     )
@@ -1014,7 +1051,7 @@ if __name__ == "__main__":
         Q_net=QNet,
         optimizer=Adam,
         lr_scheduler=ExponentialLR,
-        NR_EPISODES=501,
+        NR_EPISODES=40,
         MIN_EPSILON=0.7,
         EPSILON_DECAY_RATE=6e-4,
         N_STEP_QL=4,
