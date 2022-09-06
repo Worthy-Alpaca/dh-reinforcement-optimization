@@ -4,6 +4,9 @@ import json
 import configparser
 import requests
 import threading
+import torch
+import random
+import numpy as np
 import tkinter as tk
 from tkinter import *
 from types import FunctionType
@@ -132,7 +135,7 @@ class Interface:
             margin=50,
         )
         self.__createButton(
-            8, 1, text="Test", master=self.mainframe, function=self.__dummy, margin=50
+            8, 1, text="Train Model", master=self.mainframe, function=self.__trainModel, margin=50
         )
 
         self.__createForms()
@@ -296,6 +299,36 @@ class Interface:
         # except Exception as e:
         #     controller.error(e)
         controller.error(best_value)
+
+    def __trainModel(self):
+        random.seed(1000)
+        np.random.seed(1000)
+        torch.manual_seed(1000)
+        torch.multiprocessing.set_start_method('spawn')
+        runmodel = RunModel(
+            dbpath=self.config.get("optimizer_backend", "dbpath"),
+            numSamples=self.config.getint("default", "trainingSamples"),
+        )
+        EMBEDDING_DIMENSIONS = 10
+        EMBEDDING_ITERATIONS_T = 2
+        Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
+            # fname=os.path.join(runmodel.folder_name, shortest_fname),
+            EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
+            EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
+            OPTIMIZER=torch.optim.Adam,
+        )
+        runmodel.fit(
+            Q_func=Q_Function,
+            Q_net=QNet,
+            optimizer=Adam,
+            lr_scheduler=ExponentialLR,
+            NR_EPISODES=501,
+            MIN_EPSILON=0.7,
+            EPSILON_DECAY_RATE=6e-4,
+            N_STEP_QL=4,
+            BATCH_SIZE=16,
+            GAMMA=0.7,
+        )
 
     def __createMenu(self, menubar: tk.Menu, label: str, data: dict) -> None:
         """Create a menu in the menubar.
