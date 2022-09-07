@@ -75,12 +75,12 @@ class Controller(MyCanvas):
         labels = coords[:, 3:4]
         labels = labels[:, 0].tolist()
 
-        solutionList = []
+        solutionListOG = []
         for x in solution:
-            solutionList.append(coords[x][3:4][0])
+            solutionListOG.append(coords[x][3:4][0])
 
         if not validate:
-            solutionList = self.__calcGroups(solutionList)
+            solutionList = self.__calcGroups(solutionListOG)
         SETUPMINUTES = 10
         # groupTimings = len(solutionList) * SETUPMINUTES * 60
         groupTimings = 0
@@ -131,6 +131,18 @@ class Controller(MyCanvas):
                 lw=2,
                 alpha=0.8,
             )
+            first = solutionListOG[i]
+            if type(first) == list:
+                first = first[0]
+
+            plot.text(
+                coords[i, 0],
+                coords[i, 1],
+                coords[i, 2],
+                "%s" % (str(first)),
+                size=10,
+                zorder=1,
+            )
 
         i, next_i = solution[-1], solution[0]
         plot.plot(
@@ -154,6 +166,18 @@ class Controller(MyCanvas):
             coords[solution[0], 2],
             "x",
             markersize=10,
+        )
+        first = solutionList[0]
+        if type(first) == list:
+            first = first[0]
+
+        plot.text(
+            coords[solution[0], 0],
+            coords[solution[0], 1],
+            coords[solution[0], 2],
+            "%s" % (str(first)),
+            size=10,
+            zorder=1,
         )
         return groupTimings
 
