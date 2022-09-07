@@ -51,11 +51,17 @@ class Interface:
         self.masterframe.minsize(width=1500, height=600)
         # self.masterframe.maxsize(width=1200, height=600)
 
-        self.mainframe = tk.Frame(self.masterframe, bd=2, relief=tk.RAISED)
-        self.mainframe.pack(side="left")
+        self.mainframe = tk.Frame(
+            self.masterframe,
+            bd=2,
+            relief=tk.RAISED,
+        )
+        self.mainframe.pack(side="left", fill="both", expand=1, anchor=CENTER)
 
-        self.sideframe = tk.Frame(self.masterframe, borderwidth=1, relief=tk.RIDGE)
-        self.sideframe.pack(side="right")
+        self.sideframe = tk.Frame(
+            self.masterframe, bd=2, relief=tk.RIDGE, background="green"
+        )
+        self.sideframe.pack(side="right", fill="both", expand=1)
 
         # bind keyboard controlls
         self.mainframe.bind("<Control-x>", self.__onClose)
@@ -120,10 +126,12 @@ class Interface:
         # Canvas(self.mainframe)
         self.text = tk.Text(self.sideframe, wrap="word")
         self.text.tag_configure("stderr", foreground="#b22222")
-        self.text.pack(side="left")  # grid(row=3, column=0, columnspan=20, rowspan=10)
+        self.text.pack(
+            side="left", fill="both", expand=1
+        )  # grid(row=3, column=0, columnspan=20, rowspan=10)
 
         sys.stdout = TextRedirector(self.text, "stdout")
-        # sys.stderr = TextRedirector(self.text, "stderr")
+        sys.stderr = TextRedirector(self.text, "stderr")
         logging.basicConfig(
             level=logging.INFO,
             handlers=[
