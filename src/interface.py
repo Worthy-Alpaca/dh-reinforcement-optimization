@@ -6,6 +6,7 @@ import requests
 import threading
 import torch
 import random
+import logging
 import numpy as np
 import tkinter as tk
 from tkinter import *
@@ -13,6 +14,7 @@ from types import FunctionType
 from tkinter import Grid, filedialog, PhotoImage, ttk, messagebox
 from tkcalendar import Calendar
 from os.path import exists
+from logging import error, info, warning
 
 from misc.dataloader import KappaLoader
 from validate import Validate
@@ -46,7 +48,7 @@ class Interface:
 
         self.masterframe.title("SMD Produktion")
         self.masterframe.geometry(self.__center_window(self.masterframe, 900, 570))
-        self.masterframe.minsize(width=1200, height=600)
+        self.masterframe.minsize(width=1500, height=600)
         # self.masterframe.maxsize(width=1200, height=600)
 
         self.mainframe = tk.Frame(self.masterframe, bd=2, relief=tk.RAISED)
@@ -57,16 +59,13 @@ class Interface:
 
         # bind keyboard controlls
         self.mainframe.bind("<Control-x>", self.__onClose)
-        # self.mainframe.bind("<Control-F1>", self.__getAPIData)
-        self.mainframe.bind("<F1>", self.__startSimulation)
-        self.mainframe.bind("<F2>", self.__startCompare)
 
         if not exists(
             os.path.expanduser(os.path.normpath("~/Documents/D+H optimizer/settings"))
         ):
             os.makedirs(
                 os.path.expanduser(
-                    os.path.normpath("~/Documents/D+H optimizer/settings")
+                    os.path.normpath("~/Documents/D+H optimizer/settings/logs")
                 )
             )
         self.basePath = os.path.expanduser(
@@ -117,13 +116,26 @@ class Interface:
         self.__createMenu(menubar, "File", fileMenu)
         self.__createOptionsMenu(menubar)
         self.masterframe.config(menu=menubar)
+
         # Canvas(self.mainframe)
         self.text = tk.Text(self.sideframe, wrap="word")
         self.text.tag_configure("stderr", foreground="#b22222")
-        self.text.grid(row=3, column=0, columnspan=10, rowspan=10)
+        self.text.pack(side="left")  # grid(row=3, column=0, columnspan=20, rowspan=10)
 
         sys.stdout = TextRedirector(self.text, "stdout")
         sys.stderr = TextRedirector(self.text, "stderr")
+        self.logging = logging.basicConfig(
+            level=logging.INFO,
+            handlers=[
+                logging.FileHandler(
+                    os.path.normpath(self.basePath + "/settings/logs/logs.log")
+                ),
+                logging.StreamHandler(stream=sys.stdout),
+            ],
+            format="%(asctime)s :: %(levelname)s :: %(message)s",
+        )
+
+        # self.logging.info = TextRedirector(self.text, "stdout")
 
         MyCanvas(self.mainframe)
         self.__createButton(
@@ -135,7 +147,12 @@ class Interface:
             margin=50,
         )
         self.__createButton(
-            8, 1, text="Train Model", master=self.mainframe, function=self.__trainModel, margin=50
+            8,
+            1,
+            text="Train Model",
+            master=self.mainframe,
+            function=self.__trainModel,
+            margin=50,
         )
 
         self.__createForms()
@@ -190,7 +207,7 @@ class Interface:
                 return self.__findDBPath()
             self.dbpath = os.path.normpath(datapath)
             self.config.set("optimizer_backend", "dbpath", datapath)
-            print("Database file registered successfully.")
+            info("Database file registered successfully.")
 
         button = tk.Button(master=top, text="OK", command=getData)
         button.pack()
@@ -208,7 +225,7 @@ class Interface:
         self.config.add_section("default")
         self.config.set("default", "calcgroups", "false")
         self.config.set("default", "numCarts", "3")
-        self.config.set("default", "useAISim", "false")
+        self.config.set("default", "progressBar", "false")
         self.config.set("default", "trainingSamples", "13")
         self.config.add_section("optimizer_backend")
         self.config.set("optimizer_backend", "dbpath", "")
@@ -268,18 +285,23 @@ class Interface:
         controller = Controller(self.mainframe)
         controller.wait(message="Generating Dataset")
 
+        try:
+            startDate = self.calDate["start"]
+            endDate = self.calDate["end"]
+        except:
+            controller.error("Please set a date range.")
+            return warning("Please set a date range.")
+
         runmodel = RunModel(
             dbpath=self.config.get("optimizer_backend", "dbpath"),
             numSamples=self.config.getint("default", "trainingSamples"),
+            disableProgress=self.config.getboolean("default", "progressBar"),
         )
-        try:
-            startDate = self.calDate['start']
-            endDate = self.calDate['end']
-        except:
-            startDate = None
-            endDate = None
         loader = KappaLoader(
-            os.path.normpath(datapath), self.config.get("optimizer_backend", "dbpath"), startDate, endDate
+            os.path.normpath(datapath),
+            self.config.get("optimizer_backend", "dbpath"),
+            startDate,
+            endDate,
         )
         samples, sampleReqs = loader.getData()
         best_value, best_solution = runmodel.getBestOder(
@@ -296,15 +318,13 @@ class Interface:
             overlapThreshhold=0.5,
         )
         validate.plotSoltions()
-        # except Exception as e:
-        #     controller.error(e)
         controller.error(best_value)
 
     def __trainModel(self):
         random.seed(1000)
         np.random.seed(1000)
         torch.manual_seed(1000)
-        torch.multiprocessing.set_start_method('spawn')
+        torch.multiprocessing.set_start_method("spawn")
         runmodel = RunModel(
             dbpath=self.config.get("optimizer_backend", "dbpath"),
             numSamples=self.config.getint("default", "trainingSamples"),
@@ -371,15 +391,15 @@ class Interface:
                 self.config.get("optimizer_backend", "dbpath")
             ),
         )
-        # self.randomInterupt = tk.BooleanVar()
-        # self.randomInterupt.set(self.config.getboolean("default", "randomInterrupt"))
-        # filemenu.add_checkbutton(
-        #     label="Use Random Interuptions",
-        #     var=self.randomInterupt,
-        #     command=lambda: self.config.set(
-        #         "default", "randomInterrupt", str(self.randomInterupt.get())
-        #     ),
-        # )
+        self.progressBar = tk.BooleanVar()
+        self.progressBar.set(self.config.getboolean("default", "progressBar"))
+        filemenu.add_checkbutton(
+            label="Disable Progressbars",
+            var=self.progressBar,
+            command=lambda: self.config.set(
+                "default", "progressBar", str(self.progressBar.get())
+            ),
+        )
         # self.useAISim = tk.BooleanVar()
         # self.useAISim.set(self.config.getboolean("default", "useAISim"))
         # filemenu.add_checkbutton(
@@ -476,7 +496,7 @@ class Interface:
             top.grab_release()
             self.calDate[i] = cal.selection_get()
             self.__createLabel(posX, posY, self.calDate[i])
-            print(f'Successfully set {cal.selection_get()} as {i} Date')
+            info(f"Successfully set {cal.selection_get()} as {i} Date")
 
         cal.pack(fill="both", expand=True)
         ttk.Button(top, text="ok", command=lambda: getDate(cal)).pack()
@@ -497,6 +517,7 @@ class Interface:
             self.config.set("default", "numCarts", str(numCart))
             self.config.set("default", "trainingSamples", str(trainingSamp))
             self.config.set("optimizer_backend", "overlapThreshhold", str(address))
+            info("Successfully set variables")
             top.withdraw()
             top.grab_release()
             return True
@@ -559,26 +580,6 @@ class Interface:
             return
 
         return filename
-
-    def __compare(self) -> None:
-        """Dummy operation for now."""
-        # startDate = str(self.calDate["start"])
-        # endDate = str(self.calDate["end"])
-
-        request = requests.get(
-            f"{self.config.get('network', 'api_address')}/data/options"
-        )
-        controller = Controller(self.mainframe)
-        controller.error(request.status_code)
-        print(request.json())
-
-    def __startSimulation(self, *args: any, **kwargs: any):
-        """Starts simulation in a new Thread."""
-        threading.Thread(target=self.__simulate).start()
-
-    def __startCompare(self, *args: any, **kwargs: any):
-        """Starts Compare function in a new Thread."""
-        threading.Thread(target=self.__compare).start()
 
 
 if __name__ == "__main__":
