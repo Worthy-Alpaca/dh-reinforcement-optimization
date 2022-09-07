@@ -1,5 +1,6 @@
 from collections import namedtuple
 from genericpath import exists
+from logging import info
 import math
 import os
 from statistics import median
@@ -54,6 +55,7 @@ class RunModel:
         allowDuplicates: bool = False,
         overwriteDevice: Literal["cpu", "cuda:0"] = False,
         caching: bool = True,
+        disableProgress: bool = False,
     ) -> None:
         """Initiate the reinforcement learning model and training or prediction capabilities.
 
@@ -69,13 +71,9 @@ class RunModel:
         else:
             self.device = overwriteDevice
 
-        try:
-            if exists("./models"):
-                self.folder_name = "./models"
-            else:
-                raise KeyError
-        except:
-            self.folder_name = self.resource_path("bin/assets/models")
+        self.folder_name = Path(
+            os.path.expanduser(os.path.normpath("~/Documents/D+H optimizer/models"))
+        )
 
         self.basepath = Path(
             os.path.expanduser(os.path.normpath("~/Documents/D+H optimizer/"))
@@ -88,7 +86,6 @@ class RunModel:
         self.products = {}
         self.memory = Memory()
         self.bestModel = {}
-        path = Path(os.getcwd() + os.path.normpath("/data"))
         self.Experience = namedtuple(
             "Experience",
             ("state", "state_tsr", "action", "reward", "next_state", "next_state_tsr"),
@@ -96,13 +93,10 @@ class RunModel:
         self.State = namedtuple("State", ("W", "coords", "partial_solution"))
         self.numSamples = numSamples
         self.allowDuplicates = allowDuplicates
-        if exists(os.getcwd() + os.path.normpath("/FINAL MODEL")):
-            modelPath = Path(os.getcwd() + os.path.normpath("/FINAL MODEL"))
-        else:
-            modelPath = Path(self.resource_path("bin/assets/final model"))
-        self.model = DeployModel(modelPath)
+
         self.engine = create_engine(f"sqlite:///{dbpath}")
         self.training = True
+        self.disableProgress = disableProgress
         dbData = self.engine.execute("SELECT * FROM 'products'").fetchall()
         masterCompData = self.engine.execute("SELECT * FROM 'allcomponents'").fetchall()
         prodData = []
@@ -118,10 +112,15 @@ class RunModel:
                     self.products = pickle.load(file)
             except Exception as e:
                 raise FileNotFoundError(f"Unable to find: {self.basepath}/cache.p")
-            print("Found cached data.")
+            info("Found cached data.")
         else:
-            print("No cached data found. Generating new dataset.")
-            for i in tqdm(prodData, disable=True):
+            info("No cached data found. Generating new dataset.")
+            if exists(os.getcwd() + os.path.normpath("/FINAL MODEL")):
+                modelPath = Path(os.getcwd() + os.path.normpath("/FINAL MODEL"))
+            else:
+                modelPath = Path(self.resource_path("bin/assets/final model"))
+            self.model = DeployModel(modelPath)
+            for i in tqdm(prodData, disable=disableProgress):
                 product = i
                 overallLen = 0
                 overallTime = 0
@@ -157,10 +156,10 @@ class RunModel:
                     "comps": comps,
                 }
 
-            print("Data generation complete")
+            info("Data generation complete")
             if caching:
                 with open(self.basepath / "cache.p", "wb") as fp:
-                    print(f"Saving generated data in cache")
+                    info(f"Saving generated data in cache")
                     pickle.dump(self.products, fp, protocol=pickle.HIGHEST_PROTOCOL)
         if numSamples == -1:
             self.numSamples = len(self.products.keys())
@@ -221,6 +220,7 @@ class RunModel:
         #     self.writer.add_graph(Q_net, (state_tsr.unsqueeze(0), W.unsqueeze(0)))
 
         if fname is not None:
+            info("Loading previous best previous model.")
             checkpoint = torch.load(fname)
             Q_net.load_state_dict(checkpoint["model"])
             optimizer.load_state_dict(checkpoint["optimizer"])
@@ -662,8 +662,8 @@ class RunModel:
         # torch.backends.cudnn.benchmark = True
         Q_net = Q_net.float()
         BATCH_SIZE = self.numSamples
-        data, clist = self.generateData()
-        productDataset = ProductDataset(data, clist)
+        # data, clist = self.generateData()
+        productDataset = ProductDataset(*self.generateData())
         productDataloader = ProductDataloader(
             productDataset,
             self.numSamples,
@@ -673,7 +673,7 @@ class RunModel:
             persistent_workers=True,
             pin_memory=True,
         )
-        for episode in tqdm(range(NR_EPISODES)):
+        for episode in tqdm(range(NR_EPISODES), disable=self.disableProgress):
             coords, W_np, components = next(iter(productDataloader))
 
             coords, W, components = (
@@ -720,14 +720,6 @@ class RunModel:
                     next_node, est_reward = Q_func.get_best_action(
                         current_state_tsr, current_state
                     )
-                    if next_node == None:
-                        print()
-                    if episode % 50 == 0:
-                        print(
-                            "Ep {} | current sol: {} / next est reward: {}".format(
-                                episode, solution, est_reward
-                            )
-                        )
                 del current_state_tsr, current_state
                 next_solution = solution + [next_node]
 
@@ -835,24 +827,6 @@ class RunModel:
             self.path_lengths.append(length)
             self.writer.add_scalar("Pathlength", length, episode)
             self.__createTensorboardLogs(Q_net, episode)
-
-            if episode % 10 == 0:
-                print(
-                    "Ep %d. Loss = %.3f / median length = %.3f / last = %.4f / epsilon = %.4f / lr = %.4f"
-                    % (
-                        episode,
-                        (-1 if loss is None else loss),
-                        np.median(self.path_lengths[-50:]),
-                        length,
-                        epsilon,
-                        Q_func.optimizer.param_groups[0]["lr"],
-                    )
-                )
-                found_solutions[episode] = (
-                    W.clone(),
-                    coords.clone(),
-                    [n for n in solution],
-                )
             # prof.step()
             # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
         self.plotMetrics()
@@ -1051,7 +1025,7 @@ if __name__ == "__main__":
         Q_net=QNet,
         optimizer=Adam,
         lr_scheduler=ExponentialLR,
-        NR_EPISODES=40,
+        NR_EPISODES=1000,  # die sind noch über, bestes modell laden
         MIN_EPSILON=0.7,
         EPSILON_DECAY_RATE=6e-4,
         N_STEP_QL=4,
