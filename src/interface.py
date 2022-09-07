@@ -58,9 +58,7 @@ class Interface:
         )
         self.mainframe.pack(side="left", fill="both", expand=1, anchor=CENTER)
 
-        self.sideframe = tk.Frame(
-            self.masterframe, bd=2, relief=tk.RIDGE, background="green"
-        )
+        self.sideframe = tk.Frame(self.masterframe, bd=2, relief=tk.RIDGE)
         self.sideframe.pack(side="right", fill="both", expand=1)
 
         # bind keyboard controlls
@@ -78,21 +76,6 @@ class Interface:
             os.path.normpath("~/Documents/D+H optimizer")
         )
 
-        # configuring rows
-        Grid.rowconfigure(self.mainframe, 0, weight=1)
-        Grid.rowconfigure(self.mainframe, 1, weight=1)
-        Grid.rowconfigure(self.mainframe, 2, weight=1)
-
-        # configuring columns
-        Grid.columnconfigure(self.mainframe, 0, weight=1)
-        Grid.columnconfigure(self.mainframe, 1, weight=1)
-        Grid.columnconfigure(self.mainframe, 2, weight=1)
-        Grid.columnconfigure(self.mainframe, 3, weight=1)
-        Grid.columnconfigure(self.mainframe, 4, weight=1)
-        Grid.columnconfigure(self.mainframe, 5, weight=1)
-        Grid.columnconfigure(self.mainframe, 6, weight=1)
-        Grid.columnconfigure(self.mainframe, 7, weight=1)
-
         try:
             photo = PhotoImage(file=self.resource_path("bin/assets/logo.png"))
         except:
@@ -103,8 +86,6 @@ class Interface:
         self.calDate = {}
         self.machines = {}
         self.OptionList = []
-        self.dateLabel1 = tk.Label(self.mainframe).grid(row=1, column=3, sticky="nsew")
-        self.dateLabel2 = tk.Label(self.mainframe).grid(row=1, column=5, sticky="nsew")
         self.config = configparser.ConfigParser()
         self.__configInit()
 
@@ -145,25 +126,10 @@ class Interface:
 
         # self.logging.info = TextRedirector(self.text, "stdout")
 
-        MyCanvas(self.mainframe)
-        self.__createButton(
-            8,
-            0,
-            text="Optimize",
-            master=self.mainframe,
-            function=self.__optimize,
-            margin=50,
-        )
-        self.__createButton(
-            8,
-            1,
-            text="Train Model",
-            master=self.mainframe,
-            function=self.__trainModel,
-            margin=50,
-        )
-
         self.__createForms()
+
+        # MyCanvas(self.mainframe)
+        self.controller = Controller(self.mainframe)
 
         if exists(self.config.get("optimizer_backend", "dbpath")):
             self.dbpath = self.config.get("optimizer_backend", "dbpath")
@@ -281,12 +247,12 @@ class Interface:
     def __optimize(self):
         self.text.config(state=NORMAL)
         self.text.delete(1.0, tk.END)
-        controller = Controller(self.mainframe)
+
         try:
             startDate = self.calDate["start"]
             endDate = self.calDate["end"]
         except:
-            controller.error("Please set a date range.")
+            self.controller.error("Please set a date range.")
             return warning("Please set a date range.")
 
         if self.optimizerData == None:
@@ -299,7 +265,7 @@ class Interface:
         else:
             return
 
-        controller.wait(message="Generating Dataset")
+        self.controller.wait(message="Generating Dataset")
 
         runmodel = RunModel(
             dbpath=self.config.get("optimizer_backend", "dbpath"),
@@ -319,7 +285,7 @@ class Interface:
             plot=True,
             numCarts=self.config.getint("default", "numCarts"),
         )
-        controller(
+        self.controller(
             best_value,
             best_solution,
             dbpath=self.config.get("optimizer_backend", "dbpath"),
@@ -476,25 +442,45 @@ class Interface:
         Returns:
             tk.Label: The created Label.
         """
-        label = tk.Label(master=self.mainframe, text=text)
+        label = tk.Label(master=self.formbar, text=text)
         label.grid(column=posX, row=posY, sticky="nsew")
 
     def __createForms(self) -> None:
         """Creates the Inputs."""
-        tk.Label(self.mainframe, text="Start Date:").grid(
-            row=0, column=4, sticky="nsew"
-        )
-        tk.Label(self.mainframe, text="End Date:").grid(row=0, column=6, sticky="nsew")
+        self.formbar = tk.Frame(self.mainframe, height=100)
+        self.formbar.pack(side="top", fill="both", pady=5)
+        tk.Label(self.formbar, text="Start Date:").grid(row=0, column=4, sticky="nsew")
 
-        self.date1 = self.__createButton(
+        tk.Label(self.formbar, text="End Date:").grid(
+            row=0, column=6, sticky="nsew", padx=5
+        )
+
+        self.__createButton(
             5,
             0,
             "Select",
-            self.mainframe,
+            self.formbar,
             function=lambda: self.__showCal("start", 5, 1),
         )
-        self.date2 = self.__createButton(
-            7, 0, "Select", self.mainframe, function=lambda: self.__showCal("end", 7, 1)
+        self.__createButton(
+            7, 0, "Select", self.formbar, function=lambda: self.__showCal("end", 7, 1)
+        )
+
+        self.__createButton(
+            8,
+            0,
+            text="Optimize",
+            master=self.formbar,
+            function=self.__optimize,
+            margin=50,
+        )
+        self.__createButton(
+            8,
+            1,
+            text="Train Model",
+            master=self.formbar,
+            function=self.__trainModel,
+            margin=50,
         )
 
     def __showCal(self, i: str, posX: int, posY: int) -> tk.Toplevel:

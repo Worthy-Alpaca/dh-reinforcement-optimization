@@ -36,7 +36,7 @@ class Controller(MyCanvas):
             randomInterupt (tuple, optional): The random interrupt values. (Min, Max). Defaults to (0, 0).
             prodName (str, optional): The Product name. Defaults to "".
         """
-
+        self.figure.clear()
         self.best_value = best_value
         self.overlapThreshhold = overlapThreshhold
         self.solution = best_solution["solution"]
@@ -156,52 +156,6 @@ class Controller(MyCanvas):
             markersize=10,
         )
         return groupTimings
-
-        # self.figure.clear()
-        # plot = self.figure.add_subplot(121)
-        # ax = self.figure.add_subplot(122)
-        # runtime = sum(list(mTime.values()))
-        # # setupTime = sum(list(sTime.values()))
-        # ax.axis("off")
-        # sumtime = []
-        # for i in range(numParts):
-        #     sumtime.append(
-        #         runtime + random.randint(randomInterupt[0], randomInterupt[1])
-        #     )
-
-        # textstr = "\n".join(
-        #     (
-        #         f"Product: {prodName} ",
-        #         "",
-        #         f"Overall time needed: {round(sum(sumtime), 2)} Seconds",
-        #         f"Average Time: {round(sum(sumtime) / numParts, 2)} Seconds ",
-        #         f"Highest time: {round(max(sumtime), 2)} Seconds",
-        #         "",
-        #         "Machines",
-        #     )
-        # )
-        # substr = ""
-        # for key in mTime:
-        #     substr = (
-        #         substr
-        #         + f"\n{key} Ideal: {round(mTime[key], 2)} Seconds \n{key} Setup Time: {round(sTime[key], 2)} Seconds\n"
-        #     )
-        # textstr = textstr + substr
-        # props = dict(boxstyle="round", alpha=0.5)
-
-        # ax.text(
-        #     0.05,
-        #     0.95,
-        #     textstr,
-        #     transform=ax.transAxes,
-        #     fontsize=14,
-        #     verticalalignment="top",
-        #     wrap=True,
-        # )
-        # for key in coords:
-        #     plot.scatter(coords[key]["X"], coords[key]["Y"])
-        # plot.legend(tuple(coords.keys()), loc="upper left")
-        # self.canvas.draw()
 
     def wait(self, message: str = "") -> any:
         """Function that displays a loading screen."""

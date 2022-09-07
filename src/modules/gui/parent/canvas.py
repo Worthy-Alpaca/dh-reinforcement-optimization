@@ -30,16 +30,12 @@ class MyCanvas(tk.Canvas):
         self.scale("all", 0, 0, wscale, hscale)
 
     def __tools(self):
-        self.canvas.get_tk_widget().grid(
-            row=3, column=0, columnspan=10, rowspan=10, padx=(20, 20), sticky="nsew"
-        )
+        self.canvas.get_tk_widget().pack(fill="both", expand=1)
         self.toolbar = NavigationToolbar2Tk(
             self.canvas, self.mainframe, pack_toolbar=False
         )
         self.toolbar.update()
-        self.toolbar.grid(
-            row=13, column=0, columnspan=10, rowspan=10, padx=(20, 20), sticky="nsew"
-        )
+        self.toolbar.pack()
 
 
 if __name__ == "__main__":
