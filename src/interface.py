@@ -123,8 +123,8 @@ class Interface:
         self.text.pack(side="left")  # grid(row=3, column=0, columnspan=20, rowspan=10)
 
         sys.stdout = TextRedirector(self.text, "stdout")
-        sys.stderr = TextRedirector(self.text, "stderr")
-        self.logging = logging.basicConfig(
+        # sys.stderr = TextRedirector(self.text, "stderr")
+        logging.basicConfig(
             level=logging.INFO,
             handlers=[
                 logging.FileHandler(
@@ -143,7 +143,7 @@ class Interface:
             0,
             text="Optimize",
             master=self.mainframe,
-            function=lambda: self.__startThread(self.__optimize),
+            function=self.__optimize,
             margin=50,
         )
         self.__createButton(
@@ -207,7 +207,7 @@ class Interface:
                 return self.__findDBPath()
             self.dbpath = os.path.normpath(datapath)
             self.config.set("optimizer_backend", "dbpath", datapath)
-            info("Database file registered successfully.")
+            info("Successfully updated Database file.")
 
         button = tk.Button(master=top, text="OK", command=getData)
         button.pack()
@@ -273,6 +273,14 @@ class Interface:
     def __optimize(self):
         self.text.config(state=NORMAL)
         self.text.delete(1.0, tk.END)
+        controller = Controller(self.mainframe)
+        try:
+            startDate = self.calDate["start"]
+            endDate = self.calDate["end"]
+        except:
+            controller.error("Please set a date range.")
+            return warning("Please set a date range.")
+
         if self.optimizerData == None:
             datapath = self.__openNew(
                 startPath=os.path.expanduser(os.path.normpath("~/Downloads")),
@@ -282,15 +290,8 @@ class Interface:
                 return
         else:
             return
-        controller = Controller(self.mainframe)
-        controller.wait(message="Generating Dataset")
 
-        try:
-            startDate = self.calDate["start"]
-            endDate = self.calDate["end"]
-        except:
-            controller.error("Please set a date range.")
-            return warning("Please set a date range.")
+        controller.wait(message="Generating Dataset")
 
         runmodel = RunModel(
             dbpath=self.config.get("optimizer_backend", "dbpath"),
@@ -310,45 +311,55 @@ class Interface:
             plot=True,
             numCarts=self.config.getint("default", "numCarts"),
         )
-        validate = Validate(
+        controller(
             best_value,
             best_solution,
             dbpath=self.config.get("optimizer_backend", "dbpath"),
-            calcGroups=True,
+            calcGroups=self.config.getboolean("default", "calcgroups"),
             overlapThreshhold=0.5,
         )
-        validate.plotSoltions()
-        controller.error(best_value)
+        # try:
+        #     validate.plotSoltions()
+        # except Exception as e:
+        #     print(e)
+        # controller.error(best_value)
+        return
 
     def __trainModel(self):
-        random.seed(1000)
-        np.random.seed(1000)
-        torch.manual_seed(1000)
-        torch.multiprocessing.set_start_method("spawn")
-        runmodel = RunModel(
-            dbpath=self.config.get("optimizer_backend", "dbpath"),
-            numSamples=self.config.getint("default", "trainingSamples"),
-        )
-        EMBEDDING_DIMENSIONS = 10
-        EMBEDDING_ITERATIONS_T = 2
-        Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
-            # fname=os.path.join(runmodel.folder_name, shortest_fname),
-            EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
-            EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
-            OPTIMIZER=torch.optim.Adam,
-        )
-        runmodel.fit(
-            Q_func=Q_Function,
-            Q_net=QNet,
-            optimizer=Adam,
-            lr_scheduler=ExponentialLR,
-            NR_EPISODES=501,
-            MIN_EPSILON=0.7,
-            EPSILON_DECAY_RATE=6e-4,
-            N_STEP_QL=4,
-            BATCH_SIZE=16,
-            GAMMA=0.7,
-        )
+        if messagebox.askyesno(
+            "Start Training",
+            "Do you really want to start a new training?\nThis can take up to several hours.",
+        ):
+            random.seed(1000)
+            np.random.seed(1000)
+            torch.manual_seed(1000)
+            torch.multiprocessing.set_start_method("spawn")
+            runmodel = RunModel(
+                dbpath=self.config.get("optimizer_backend", "dbpath"),
+                numSamples=self.config.getint("default", "trainingSamples"),
+            )
+            EMBEDDING_DIMENSIONS = 10
+            EMBEDDING_ITERATIONS_T = 2
+            Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
+                # fname=os.path.join(runmodel.folder_name, shortest_fname),
+                EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
+                EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
+                OPTIMIZER=torch.optim.Adam,
+            )
+            runmodel.fit(
+                Q_func=Q_Function,
+                Q_net=QNet,
+                optimizer=Adam,
+                lr_scheduler=ExponentialLR,
+                NR_EPISODES=501,
+                MIN_EPSILON=0.7,
+                EPSILON_DECAY_RATE=6e-4,
+                N_STEP_QL=4,
+                BATCH_SIZE=16,
+                GAMMA=0.7,
+            )
+        else:
+            return
 
     def __createMenu(self, menubar: tk.Menu, label: str, data: dict) -> None:
         """Create a menu in the menubar.
@@ -378,17 +389,20 @@ class Interface:
         filemenu = tk.Menu(menubar, tearoff=0)
         self.useIdealState = tk.BooleanVar()
         self.useIdealState.set(self.config.getboolean("default", "calcgroups"))
+
+        def updateConfig(*data):
+            self.config.set(*data)
+            info(f"Successfully updated {data[1]} option")
+
         filemenu.add_checkbutton(
             label="Calculate Groups",
             var=self.useIdealState,
-            command=lambda: self.config.set(
-                "default", "calcgroups", str(self.useIdealState.get())
-            ),
-        )
-        filemenu.add_command(
-            label="Change Database File",
-            command=lambda: self.__findDBPath(
-                self.config.get("optimizer_backend", "dbpath")
+            command=lambda: updateConfig(
+                "default",
+                "calcgroups",
+                str(self.useIdealState.get())
+                # command=lambda: self.config.set(
+                #     "default", "calcgroups", str(self.useIdealState.get())
             ),
         )
         self.progressBar = tk.BooleanVar()
@@ -396,20 +410,18 @@ class Interface:
         filemenu.add_checkbutton(
             label="Disable Progressbars",
             var=self.progressBar,
-            command=lambda: self.config.set(
+            command=lambda: updateConfig(
                 "default", "progressBar", str(self.progressBar.get())
             ),
         )
-        # self.useAISim = tk.BooleanVar()
-        # self.useAISim.set(self.config.getboolean("default", "useAISim"))
-        # filemenu.add_checkbutton(
-        #     label="Use AI Simulation",
-        #     var=self.useAISim,
-        #     command=lambda: self.config.set(
-        #         "default", "useAISim", str(self.randomInterupt.get())
-        #     ),
-        # )
+
         filemenu.add_separator()
+        filemenu.add_command(
+            label="Change Database File",
+            command=lambda: self.__findDBPath(
+                self.config.get("optimizer_backend", "dbpath")
+            ),
+        )
         filemenu.add_command(label="Options", command=self.__setOptions)
         menubar.add_cascade(label="Options", menu=filemenu)
 
@@ -517,7 +529,9 @@ class Interface:
             self.config.set("default", "numCarts", str(numCart))
             self.config.set("default", "trainingSamples", str(trainingSamp))
             self.config.set("optimizer_backend", "overlapThreshhold", str(address))
-            info("Successfully set variables")
+            info(f"Successfully set trainingSamples to {str(trainingSamp)} ")
+            info(f"Successfully set numCarts to {str(numCart)} ")
+            info(f"Successfully set overlapThreshhold to {str(address)} ")
             top.withdraw()
             top.grab_release()
             return True
