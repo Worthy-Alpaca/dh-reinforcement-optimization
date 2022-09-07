@@ -1,3 +1,4 @@
+from logging import info
 from helper import Memory, UtilFunctions, Cartsetup, Coating
 from matplotlib import pyplot as plt
 import numpy as np
@@ -28,7 +29,9 @@ class Validate:
         self.engine = create_engine(f"sqlite:///{dbpath}")
 
     def plotSoltions(self):
-        print("The best value for this iteration is: ", self.best_value)
+        info(
+            f"The best value for this iteration is: {self.best_value}",
+        )
 
         groupTimings = self.__plot_solution(
             self.coords,
