@@ -1,3 +1,4 @@
+from logging import warning
 import os
 import sqlalchemy
 import pandas as pd
@@ -230,12 +231,13 @@ class DataBaseLoader:
 
 
 class KappaLoader:
-    def __init__(self, path: Path, dbpath: str, startDate: str = None, endDate: str = None) -> None:
+    def __init__(
+        self, path: Path, dbpath: str, startDate: str = None, endDate: str = None
+    ) -> None:
         data = pd.read_excel(path)
 
         data = data[["Unnamed: 3", "Material", "VerursMenge"]]
-        data['Date'] = pd.to_datetime(data["Unnamed: 3"], errors="coerce")
-        print(data.head())
+        data["Date"] = pd.to_datetime(data["Unnamed: 3"], errors="coerce")
         if startDate is not None and endDate is not None:
             after_start_date = data["Date"] >= pd.to_datetime(startDate)
             before_end_date = data["Date"] <= pd.to_datetime(endDate)
@@ -252,8 +254,8 @@ class KappaLoader:
         return self.getData()
 
     def getData(self):
-        print("REMOVING THE FOLLOWING ITEMS FROM LIST DUE TO LACK OF REFERENCE DATA:")
-        print(
+        warning("REMOVING THE FOLLOWING ITEMS FROM LIST DUE TO LACK OF REFERENCE DATA:")
+        warning(
             self.data[~self.data["Material"].isin(self.referenceData)][
                 "Material"
             ].tolist()
