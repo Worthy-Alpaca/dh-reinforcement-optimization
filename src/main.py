@@ -10,7 +10,7 @@ from types import FunctionType
 from typing import Literal, NamedTuple
 from unittest import result
 import pickle
-
+import optuna
 from matplotlib import pyplot as plt
 from model import QNetModel
 from helper import QFunction
@@ -171,6 +171,8 @@ class RunModel:
         EMBEDDING_ITERATIONS_T: int = 2,
         INIT_LR: float = 3e-3,
         OPTIMIZER: FunctionType = torch.optim.Adam,
+        optim_args: dict = {},
+        loss_func: FunctionType = torch.nn.MSELoss,
         LR_DECAY_RATE: float = 1.0 - 2e-5,
     ):
         """Initiate the model state loading. If no `fname` is given, a new model will be initialized.
@@ -192,7 +194,7 @@ class RunModel:
             device=self.device, emb_dim=EMBEDDING_DIMENSIONS, T=EMBEDDING_ITERATIONS_T
         )
         Q_net.to(self.device)
-        optimizer = OPTIMIZER(Q_net.parameters(), lr=INIT_LR)
+        optimizer = OPTIMIZER(Q_net.parameters(), lr=INIT_LR, **optim_args)
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, gamma=LR_DECAY_RATE
         )
@@ -226,7 +228,9 @@ class RunModel:
             optimizer.load_state_dict(checkpoint["optimizer"])
             lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
 
-        Q_func = QFunction(Q_net, optimizer, lr_scheduler, device=self.device)
+        Q_func = QFunction(
+            Q_net, optimizer, lr_scheduler, device=self.device, loss_fn=loss_func
+        )
         return Q_func, Q_net, optimizer, lr_scheduler
 
     def checkpoint_model(
@@ -638,6 +642,7 @@ class RunModel:
         N_STEP_QL: int,
         BATCH_SIZE: int,
         GAMMA: float,
+        trial: optuna.trial.Trial = None,
     ):
         """Train the current model.
 
@@ -673,6 +678,7 @@ class RunModel:
             persistent_workers=True,
             pin_memory=True,
         )
+        step = -1
         for episode in tqdm(range(NR_EPISODES), disable=self.disableProgress):
             coords, W_np, components = next(iter(productDataloader))
 
@@ -711,6 +717,7 @@ class RunModel:
             t = -1
             while not self.helper.is_state_final(current_state):
                 t += 1  # time step of this episode
+                step += 1
                 if epsilon >= random.random():
                     # explore
                     next_node = self.helper.get_next_neighbor_random(current_state)
@@ -810,7 +817,7 @@ class RunModel:
                     self.writer.add_scalar(
                         "LearningRate", Q_func.optimizer.param_groups[0]["lr"], t
                     )
-
+                    # trial.report(loss, step)
                     med_length = np.median(self.path_lengths[-100:])
                     if med_length < current_min_med_length:
                         current_min_med_length = med_length
@@ -827,9 +834,25 @@ class RunModel:
             self.path_lengths.append(length)
             self.writer.add_scalar("Pathlength", length, episode)
             self.__createTensorboardLogs(Q_net, episode)
+            if len(self.losses) < 1:
+                trial.report(-1.0, episode)
+            else:
+                trial.report(
+                    np.median(
+                        np.convolve(
+                            np.array(self.losses), np.ones((100,)) / 100, mode="valid"
+                        )
+                    ),
+                    episode,
+                )
+            if trial.should_prune():
+                self.writer.close()
+                raise optuna.exceptions.TrialPruned()
             # prof.step()
             # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
-        self.plotMetrics()
+        return np.median(
+            np.convolve(np.array(self.losses), np.ones((100,)) / 100, mode="valid")
+        )
 
     def __createTensorboardLogs(self, model: nn.Module, epoch):
         for name, module in model.named_children():
