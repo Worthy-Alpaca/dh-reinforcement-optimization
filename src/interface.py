@@ -124,11 +124,8 @@ class Interface:
             format="%(asctime)s :: %(levelname)s :: %(message)s",
         )
 
-        # self.logging.info = TextRedirector(self.text, "stdout")
-
         self.__createForms()
 
-        # MyCanvas(self.mainframe)
         self.controller = Controller(self.mainframe)
 
         if exists(self.config.get("optimizer_backend", "dbpath")):
@@ -198,6 +195,7 @@ class Interface:
 
         self.config.add_section("default")
         self.config.set("default", "calcgroups", "false")
+        self.config.set("default", "useCache", "true")
         self.config.set("default", "numCarts", "3")
         self.config.set("default", "progressBar", "false")
         self.config.set("default", "trainingSamples", "13")
@@ -270,7 +268,9 @@ class Interface:
         runmodel = RunModel(
             dbpath=self.config.get("optimizer_backend", "dbpath"),
             numSamples=self.config.getint("default", "trainingSamples"),
+            caching=self.config.getboolean("default", "useCache"),
             disableProgress=self.config.getboolean("default", "progressBar"),
+            overwriteDevice="cpu",
         )
         loader = KappaLoader(
             os.path.normpath(datapath),
@@ -311,6 +311,7 @@ class Interface:
             runmodel = RunModel(
                 dbpath=self.config.get("optimizer_backend", "dbpath"),
                 numSamples=self.config.getint("default", "trainingSamples"),
+                caching=self.config.getboolean("default", "useCache"),
             )
             EMBEDDING_DIMENSIONS = 10
             EMBEDDING_ITERATIONS_T = 2
@@ -372,11 +373,7 @@ class Interface:
             label="Calculate Groups",
             var=self.useIdealState,
             command=lambda: updateConfig(
-                "default",
-                "calcgroups",
-                str(self.useIdealState.get())
-                # command=lambda: self.config.set(
-                #     "default", "calcgroups", str(self.useIdealState.get())
+                "default", "calcgroups", str(self.useIdealState.get())
             ),
         )
         self.progressBar = tk.BooleanVar()
@@ -386,6 +383,16 @@ class Interface:
             var=self.progressBar,
             command=lambda: updateConfig(
                 "default", "progressBar", str(self.progressBar.get())
+            ),
+        )
+
+        self.useCache = tk.BooleanVar()
+        self.useCache.set(self.config.getboolean("default", "useCache"))
+        filemenu.add_checkbutton(
+            label="Use Cached Data",
+            var=self.useCache,
+            command=lambda: updateConfig(
+                "default", "useCache", str(self.useCache.get())
             ),
         )
 
