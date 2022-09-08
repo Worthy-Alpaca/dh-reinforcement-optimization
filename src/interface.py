@@ -8,6 +8,7 @@ import torch
 import random
 import logging
 import numpy as np
+import ctypes as ct
 import tkinter as tk
 from tkinter import *
 from types import FunctionType
@@ -41,29 +42,10 @@ class Interface:
     def __init__(self) -> None:
         """Creates the interface and it's child modules."""
         self.masterframe = tk.Tk()
-        self.style = ttk.Style(self.masterframe)
-        self.style.theme_use("alt")
-
         self.masterframe.protocol("WM_DELETE_WINDOW", self.__onClose)
-
         self.masterframe.title("SMD Produktion")
         self.masterframe.geometry(self.__center_window(self.masterframe, 900, 570))
         self.masterframe.minsize(width=1500, height=600)
-        # self.masterframe.maxsize(width=1200, height=600)
-
-        self.mainframe = tk.Frame(
-            self.masterframe,
-            bd=2,
-            relief=tk.RAISED,
-        )
-        self.mainframe.pack(side="left", fill="both", expand=1, anchor=CENTER)
-
-        self.sideframe = tk.Frame(self.masterframe, bd=2, relief=tk.RIDGE)
-        self.sideframe.pack(side="right", fill="both", expand=1)
-
-        # bind keyboard controlls
-        self.mainframe.bind("<Control-x>", self.__onClose)
-
         if not exists(
             os.path.expanduser(os.path.normpath("~/Documents/D+H optimizer/settings"))
         ):
@@ -76,6 +58,36 @@ class Interface:
             os.path.normpath("~/Documents/D+H optimizer")
         )
 
+        if exists(os.getcwd() + os.path.normpath("/src/assets/awthemes-10.4.0")):
+            path = os.getcwd() + os.path.normpath("/src/assets/awthemes-10.4.0")
+        else:
+            path = self.resource_path("bin/assets/awthemes-10.4.0")
+        self.style = ttk.Style(self.masterframe)
+        self.masterframe.tk.call("lappend", "auto_path", path)
+        self.masterframe.tk.call("package", "require", "awlight")
+        self.masterframe.tk.call("package", "require", "awdark")
+        self.config = configparser.ConfigParser()
+        self.__configInit()
+
+        if self.config.getboolean("default", "darkmode"):
+            self.style.theme_use("awdark")
+        else:
+            self.style.theme_use("awlight")
+
+        # self.masterframe.maxsize(width=1200, height=600)
+
+        self.mainframe = ttk.Frame(
+            self.masterframe,
+            relief=tk.RAISED,
+        )
+        self.mainframe.pack(side="left", fill="both", expand=1, anchor=CENTER)
+        # self.mainframe.tk.call("package", "require", "awdark")
+        self.sideframe = ttk.Frame(self.masterframe, relief=tk.RIDGE)
+        self.sideframe.pack(side="right", fill="both", expand=1)
+
+        # bind keyboard controlls
+        self.mainframe.bind("<Control-x>", self.__onClose)
+
         try:
             photo = PhotoImage(file=self.resource_path("bin/assets/logo.png"))
         except:
@@ -86,13 +98,11 @@ class Interface:
         self.calDate = {}
         self.machines = {}
         self.OptionList = []
-        self.config = configparser.ConfigParser()
-        self.__configInit()
 
         self.optimizerData = None
 
         # Create interface elements
-        menubar = tk.Menu(self.masterframe)
+        menubar = tk.Menu(self.masterframe, border=1, relief=RAISED)
         fileMenu = {
             "New": self.__new,
             "Load": self.__openNew,
@@ -199,6 +209,7 @@ class Interface:
         self.config.set("default", "numCarts", "3")
         self.config.set("default", "progressBar", "false")
         self.config.set("default", "trainingSamples", "13")
+        self.config.set("default", "darkmode", "true")
         self.config.add_section("optimizer_backend")
         self.config.set("optimizer_backend", "dbpath", "")
         self.config.set("optimizer_backend", "overlapThreshhold", "0.5")
@@ -368,6 +379,11 @@ class Interface:
         def updateConfig(*data):
             self.config.set(*data)
             info(f"Successfully updated {data[1]} option")
+            if data[1] == "darkmode":
+                if self.useDarkmode.get():
+                    self.style.theme_use("awdark")
+                else:
+                    self.style.theme_use("awlight")
 
         filemenu.add_checkbutton(
             label="Calculate Groups",
@@ -393,6 +409,16 @@ class Interface:
             var=self.useCache,
             command=lambda: updateConfig(
                 "default", "useCache", str(self.useCache.get())
+            ),
+        )
+
+        self.useDarkmode = tk.BooleanVar()
+        self.useDarkmode.set(self.config.getboolean("default", "darkmode"))
+        filemenu.add_checkbutton(
+            label="Use Darkmode",
+            var=self.useDarkmode,
+            command=lambda: updateConfig(
+                "default", "darkmode", str(self.useDarkmode.get())
             ),
         )
 
@@ -429,10 +455,8 @@ class Interface:
         """
         if margin == None:
             margin = 30
-        button = tk.Button(
+        button = ttk.Button(
             master=master,
-            height=1,
-            width=10,
             text=text,
             command=lambda: self.__startThread(function),
         )
@@ -449,16 +473,16 @@ class Interface:
         Returns:
             tk.Label: The created Label.
         """
-        label = tk.Label(master=self.formbar, text=text)
+        label = ttk.Label(master=self.formbar, text=text)
         label.grid(column=posX, row=posY, sticky="nsew")
 
     def __createForms(self) -> None:
         """Creates the Inputs."""
-        self.formbar = tk.Frame(self.mainframe, height=100)
+        self.formbar = ttk.Frame(self.mainframe, height=100)
         self.formbar.pack(side="top", fill="both", pady=5)
-        tk.Label(self.formbar, text="Start Date:").grid(row=0, column=4, sticky="nsew")
+        ttk.Label(self.formbar, text="Start Date:").grid(row=0, column=4, sticky="nsew")
 
-        tk.Label(self.formbar, text="End Date:").grid(
+        ttk.Label(self.formbar, text="End Date:").grid(
             row=0, column=6, sticky="nsew", padx=5
         )
 
@@ -520,8 +544,10 @@ class Interface:
         Returns:
             tk.Toplevel: The created window.
         """
-        top = self.__createToplevel()
-        top.title("Options")
+        toplevel = self.__createToplevel(height=250)
+        toplevel.title("Options")
+        top = ttk.Frame(toplevel)
+        top.pack(side="top", expand=1, fill="both")
 
         def callback():
             numCart = numCarts.get()
@@ -533,26 +559,26 @@ class Interface:
             info(f"Successfully set trainingSamples to {str(trainingSamp)} ")
             info(f"Successfully set numCarts to {str(numCart)} ")
             info(f"Successfully set overlapThreshhold to {str(address)} ")
-            top.withdraw()
-            top.grab_release()
+            toplevel.withdraw()
+            toplevel.grab_release()
             return True
 
-        tk.Label(top, text="Number of Samples to use in training").pack()
+        ttk.Label(top, text="Number of Samples to use in training").pack(pady=5)
         trainingSamples = tk.IntVar()
         trainingSamples.set(self.config.getint("default", "trainingSamples"))
-        tk.Entry(top, textvariable=trainingSamples).pack()
+        ttk.Entry(top, textvariable=trainingSamples).pack(pady=5)
 
-        tk.Label(top, text="Number of Carts available").pack()
+        ttk.Label(top, text="Number of Carts available").pack(pady=5)
         numCarts = tk.IntVar()
         numCarts.set(self.config.getint("default", "numCarts"))
-        tk.Entry(top, textvariable=numCarts).pack()
+        ttk.Entry(top, textvariable=numCarts).pack(pady=5)
 
-        tk.Label(top, text="Overlap Threshhold").pack()
+        ttk.Label(top, text="Overlap Threshhold").pack(pady=5)
         overlapThreshhold = tk.StringVar()
         overlapThreshhold.set(self.config.get("optimizer_backend", "overlapThreshhold"))
-        tk.Entry(top, textvariable=overlapThreshhold).pack()
+        ttk.Entry(top, textvariable=overlapThreshhold).pack(pady=5)
 
-        ttk.Button(top, text="OK", command=callback).pack()
+        ttk.Button(top, text="OK", command=callback).pack(pady=5)
 
     def __new(self) -> None:
         """Clears all entries."""
