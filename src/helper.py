@@ -10,12 +10,13 @@ class QFunction:
         model: nn.Module,
         optimizer: torch.optim,
         lr_scheduler,
+        loss_fn: torch.nn = nn.HuberLoss,
         device=torch.device("cpu"),
     ) -> None:
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.loss_fn = nn.HuberLoss()
+        self.loss_fn = loss_fn()
         self.device = device
 
     def predict(self, state_tsr, W):
