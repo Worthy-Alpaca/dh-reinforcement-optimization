@@ -17,6 +17,7 @@ class Controller(MyCanvas):
 
     def __init__(self, frame: tk.Tk) -> None:
         super().__init__(frame)
+        self.dark = False
 
     def __call__(
         self,
@@ -107,7 +108,6 @@ class Controller(MyCanvas):
         )
 
         n = len(coords)
-
         ax.text(
             0.05,
             0.95,
@@ -116,6 +116,7 @@ class Controller(MyCanvas):
             fontsize=14,
             verticalalignment="top",
             wrap=True,
+            color="#ffffff" if self.dark else "#333333",
         )
         ax.set_title(
             "model / overlap = %.5f s"
@@ -124,7 +125,8 @@ class Controller(MyCanvas):
                     self.solution,
                 )[0]
                 # + groupTimings
-            )
+            ),
+            color="#ffffff" if self.dark else "#333333",
         )
 
         for idx in range(n - 1):
