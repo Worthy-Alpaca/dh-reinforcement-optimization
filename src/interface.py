@@ -33,9 +33,11 @@ from helper import TextRedirector
 try:
     from src.modules.gui.parent.canvas import MyCanvas
     from src.modules.gui.controller.controller import Controller
+    from src.modules.gui.parent.menubar import Titlebar, Menubar, MenuCustom
 except:
     from modules.gui.parent.canvas import MyCanvas
     from modules.gui.controller.controller import Controller
+    from modules.gui.parent.menubar import Titlebar, Menubar, MenuCustom
 
 
 class Interface:
@@ -43,9 +45,10 @@ class Interface:
         """Creates the interface and it's child modules."""
         self.masterframe = tk.Tk()
         self.masterframe.protocol("WM_DELETE_WINDOW", self.__onClose)
-        self.masterframe.title("SMD Produktion")
-        self.masterframe.geometry(self.__center_window(self.masterframe, 900, 570))
+        # self.masterframe.title("SMD Produktion")
+        # self.masterframe.geometry(self.__center_window(self.masterframe, 900, 570))
         self.masterframe.minsize(width=1500, height=600)
+        self.masterframe.overrideredirect(True)
         if not exists(
             os.path.expanduser(os.path.normpath("~/Documents/D+H optimizer/settings"))
         ):
@@ -58,43 +61,48 @@ class Interface:
             os.path.normpath("~/Documents/D+H optimizer")
         )
 
-        if exists(os.getcwd() + os.path.normpath("/src/assets/awthemes-10.4.0")):
-            path = os.getcwd() + os.path.normpath("/src/assets/awthemes-10.4.0")
+        if exists(os.getcwd() + os.path.normpath("/src/assets/theme")):
+            path = os.getcwd() + os.path.normpath("/src/assets")
         else:
-            path = self.resource_path("bin/assets/awthemes-10.4.0")
+            path = self.resource_path("bin/assets")
         self.style = ttk.Style(self.masterframe)
-        self.masterframe.tk.call("lappend", "auto_path", path)
-        self.masterframe.tk.call("package", "require", "awlight")
-        self.masterframe.tk.call("package", "require", "awdark")
+        self.masterframe.tk.call("source", path + "/azure.tcl")
+        # self.masterframe.tk.call("lappend", "auto_path", path)
+        # self.masterframe.tk.call("package", "require", "dark")
+        # self.masterframe.tk.call("package", "require", "light")
         self.config = configparser.ConfigParser()
         self.__configInit()
 
         if self.config.getboolean("default", "darkmode"):
-            self.style.theme_use("awdark")
+            self.masterframe.tk.call("set_theme", "dark")
         else:
-            self.style.theme_use("awlight")
+            self.masterframe.tk.call("set_theme", "light")
 
         # self.masterframe.maxsize(width=1200, height=600)
 
-        self.mainframe = ttk.Frame(
-            self.masterframe,
-            relief=tk.RAISED,
-        )
-        self.mainframe.pack(side="left", fill="both", expand=1, anchor=CENTER)
-        # self.mainframe.tk.call("package", "require", "awdark")
-        self.sideframe = ttk.Frame(self.masterframe, relief=tk.RIDGE)
-        self.sideframe.pack(side="right", fill="both", expand=1)
-
-        # bind keyboard controlls
-        self.mainframe.bind("<Control-x>", self.__onClose)
+        big_frame = ttk.Frame(self.masterframe)
 
         try:
-            photo = PhotoImage(file=self.resource_path("bin/assets/logo.png"))
+            self.photo = PhotoImage(file=self.resource_path("bin/assets/logo.gif"))
         except:
-            photo = PhotoImage(
-                file=os.getcwd() + os.path.normpath("/src/assets/logo.png")
+            self.photo = PhotoImage(
+                file=os.getcwd() + os.path.normpath("/src/assets/logo.gif")
             )
-        self.masterframe.iconphoto(True, photo)
+        # self.masterframe.iconphoto(True, photo)
+
+        Titlebar(
+            self.masterframe,
+            big_frame,
+            self.photo,
+            "SMD Produktions Optimierung",
+            False,
+            False,
+            True,
+            1500,
+            600,
+            self.__onClose,
+        )
+
         self.calDate = {}
         self.machines = {}
         self.OptionList = []
@@ -102,24 +110,30 @@ class Interface:
         self.optimizerData = None
 
         # Create interface elements
-        menubar = tk.Menu(self.masterframe, border=1, relief=RAISED)
-        fileMenu = {
-            "New": self.__new,
-            "Load": self.__openNew,
-            "Save": self.__saveAs,
-            "seperator": "",
-            "Exit Strg+x": self.__onClose,
-        }
-        self.__createMenu(menubar, "File", fileMenu)
+        menubar = Menubar(self.masterframe)
+        menu = MenuCustom(menubar, "File")
+        menu.add_command("New", self.__new)
+        menu.add_command("Load", self.__openNew)
+        menu.add_command("Save", self.__saveAs)
+        menu.add_separator()
+        menu.add_command("Exit", self.__onClose)
         self.__createOptionsMenu(menubar)
-        self.masterframe.config(menu=menubar)
+        # big_frame.pack(fill="x", expand=True)
 
-        # Canvas(self.mainframe)
+        self.mainframe = ttk.Frame(
+            self.masterframe,
+        )
+        self.mainframe.pack(side="left", fill="both", expand=1, anchor=CENTER)
+        # self.mainframe.tk.call("package", "require", "awdark")
+        self.sideframe = ttk.Frame(self.masterframe)
+        self.sideframe.pack(side="right", fill="both", expand=1)
+
+        # bind keyboard controlls
+        self.mainframe.bind("<Control-x>", self.__onClose)
+
         self.text = tk.Text(self.sideframe, wrap="word")
         self.text.tag_configure("stderr", foreground="#b22222")
-        self.text.pack(
-            side="left", fill="both", expand=1
-        )  # grid(row=3, column=0, columnspan=20, rowspan=10)
+        self.text.pack(side="left", fill="both", expand=1)
 
         sys.stdout = TextRedirector(self.text, "stdout")
         sys.stderr = TextRedirector(self.text, "stderr")
@@ -137,6 +151,11 @@ class Interface:
         self.__createForms()
 
         self.controller = Controller(self.mainframe)
+        if self.config.getboolean("default", "darkmode"):
+            self.controller.figure.patch.set_facecolor("#333333")
+            self.controller.dark = True
+        else:
+            self.controller.figure.patch.set_facecolor("#ffffff")
 
         if exists(self.config.get("optimizer_backend", "dbpath")):
             self.dbpath = self.config.get("optimizer_backend", "dbpath")
@@ -372,18 +391,25 @@ class Interface:
         Returns:
             tk.Menu: The created menu.
         """
-        filemenu = tk.Menu(menubar, tearoff=0)
+        filemenu = MenuCustom(menubar, "Options")
         self.useIdealState = tk.BooleanVar()
         self.useIdealState.set(self.config.getboolean("default", "calcgroups"))
+
+        def change_theme():
+            if self.masterframe.tk.call("ttk::style", "theme", "use") == "azure-dark":
+                self.masterframe.tk.call("set_theme", "light")
+                self.controller.figure.patch.set_facecolor("#ffffff")
+                self.controller.dark = False
+            else:
+                self.masterframe.tk.call("set_theme", "dark")
+                self.controller.figure.patch.set_facecolor("#333333")
+                self.controller.dark = True
 
         def updateConfig(*data):
             self.config.set(*data)
             info(f"Successfully updated {data[1]} option")
             if data[1] == "darkmode":
-                if self.useDarkmode.get():
-                    self.style.theme_use("awdark")
-                else:
-                    self.style.theme_use("awlight")
+                change_theme()
 
         filemenu.add_checkbutton(
             label="Calculate Groups",
@@ -430,7 +456,6 @@ class Interface:
             ),
         )
         filemenu.add_command(label="Options", command=self.__setOptions)
-        menubar.add_cascade(label="Options", menu=filemenu)
 
     def __createButton(
         self,
