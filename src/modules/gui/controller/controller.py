@@ -81,6 +81,8 @@ class Controller(MyCanvas):
 
         if not validate:
             solutionList = self.__calcGroups(solutionListOG)
+        else:
+            solutionList = solutionListOG
         SETUPMINUTES = 10
         # groupTimings = len(solutionList) * SETUPMINUTES * 60
         groupTimings = 0
@@ -98,7 +100,11 @@ class Controller(MyCanvas):
         plot = self.figure.add_subplot(121, projection="3d")
         ax = self.figure.add_subplot(122)
         ax.axis("off")
-        plot.scatter(coords[:, 0], coords[:, 1], coords[:, 2])
+        plot.scatter(
+            coords[:, 0],
+            coords[:, 1],
+            coords[:, 2],
+        )
 
         n = len(coords)
 
@@ -130,18 +136,6 @@ class Controller(MyCanvas):
                 "k",
                 lw=2,
                 alpha=0.8,
-            )
-            first = solutionListOG[i]
-            if type(first) == list:
-                first = first[0]
-
-            plot.text(
-                coords[i, 0],
-                coords[i, 1],
-                coords[i, 2],
-                "%s" % (str(first)),
-                size=10,
-                zorder=1,
             )
 
         i, next_i = solution[-1], solution[0]
