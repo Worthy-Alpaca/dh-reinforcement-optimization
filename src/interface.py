@@ -45,10 +45,6 @@ class Interface:
         """Creates the interface and it's child modules."""
         self.masterframe = tk.Tk()
         self.masterframe.protocol("WM_DELETE_WINDOW", self.__onClose)
-        # self.masterframe.title("SMD Produktion")
-        # self.masterframe.geometry(
-        #     self.__center_window(self.masterframe, width=1500, height=600)
-        # )
         self.masterframe.minsize(width=1500, height=600)
         self.masterframe.overrideredirect(True)
         if not exists(
@@ -69,9 +65,6 @@ class Interface:
             path = self.resource_path("bin/assets")
         self.style = ttk.Style(self.masterframe)
         self.masterframe.tk.call("source", path + "/azure.tcl")
-        # self.masterframe.tk.call("lappend", "auto_path", path)
-        # self.masterframe.tk.call("package", "require", "dark")
-        # self.masterframe.tk.call("package", "require", "light")
         self.config = configparser.ConfigParser()
         self.__configInit()
 
@@ -79,8 +72,6 @@ class Interface:
             self.masterframe.tk.call("set_theme", "dark")
         else:
             self.masterframe.tk.call("set_theme", "light")
-
-        # self.masterframe.maxsize(width=1200, height=600)
 
         big_frame = ttk.Frame(self.masterframe)
 
@@ -90,7 +81,6 @@ class Interface:
             self.photo = PhotoImage(
                 file=os.getcwd() + os.path.normpath("/src/assets/logo.gif")
             )
-        # self.masterframe.iconphoto(True, photo)
 
         Titlebar(
             self.masterframe,
@@ -120,13 +110,11 @@ class Interface:
         menu.add_separator()
         menu.add_command("Exit", self.__onClose)
         self.__createOptionsMenu(menubar)
-        # big_frame.pack(fill="x", expand=True)
 
         self.mainframe = ttk.Frame(
             self.masterframe,
         )
         self.mainframe.pack(side="left", fill="both", expand=1, anchor=CENTER)
-        # self.mainframe.tk.call("package", "require", "awdark")
         self.sideframe = ttk.Frame(self.masterframe)
         self.sideframe.pack(side="right", fill="both", expand=1)
 
@@ -339,11 +327,6 @@ class Interface:
             calcGroups=self.config.getboolean("default", "calcgroups"),
             overlapThreshhold=0.5,
         )
-        # try:
-        #     validate.plotSoltions()
-        # except Exception as e:
-        #     print(e)
-        # controller.error(best_value)
         return
 
     def __trainModel(self):
