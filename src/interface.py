@@ -12,7 +12,7 @@ import ctypes as ct
 import tkinter as tk
 from tkinter import *
 from types import FunctionType
-from tkinter import Grid, filedialog, PhotoImage, ttk, messagebox
+from tkinter import Grid, filedialog, PhotoImage, ttk
 from tkcalendar import Calendar
 from os.path import exists
 from logging import error, info, warning
@@ -202,10 +202,9 @@ class Interface:
         return top
 
     def __findDBPath(self, basepath=False):
-        top = self.__createToplevel(150, 300)
-        top.title("Options")
+        top = self.__createToplevel(150, 300, title="Options")
 
-        label = tk.Label(
+        label = ttk.Label(
             master=top, text="Please navigate to the product database file."
         )
         label.pack()
@@ -224,7 +223,7 @@ class Interface:
             self.config.set("optimizer_backend", "dbpath", datapath)
             info("Successfully updated Database file.")
 
-        button = tk.Button(master=top, text="OK", command=getData)
+        button = ttk.Button(master=top, text="OK", command=getData)
         button.pack()
 
     def __configInit(self) -> configparser.ConfigParser:
@@ -258,7 +257,7 @@ class Interface:
 
     def __onClose(self, *args: any, **kwargs: any) -> None:
         """Closing Operation. Saves config variables to file."""
-        if messagebox.askokcancel(
+        if self.__askQuestion(
             "Quit",
             "Do you want to quit?",
         ):
@@ -345,9 +344,11 @@ class Interface:
         return
 
     def __trainModel(self):
-        if messagebox.askyesno(
+        if self.__askQuestion(
             "Start Training",
             "Do you really want to start a new training?\nThis can take up to several hours.",
+            height=200,
+            width=400,
         ):
             random.seed(1000)
             np.random.seed(1000)
@@ -381,7 +382,7 @@ class Interface:
         else:
             return
 
-    def __createMenu(self, menubar: tk.Menu, label: str, data: dict) -> None:
+    def __askQuestion(self, title, message, height=200, width=300) -> None:
         """Create a menu in the menubar.
 
         Args:
@@ -389,13 +390,40 @@ class Interface:
             label (str): The Label of the menu.
             data (dict): Options in the menu.
         """
-        filemenu = tk.Menu(menubar, tearoff=0)
-        for key in data:
-            if key == "seperator":
-                filemenu.add_separator()
-            else:
-                filemenu.add_command(label=key, command=data[key])
-        menubar.add_cascade(label=label, menu=filemenu)
+        messageList = message.split("\n")
+        maxlen = max([len(x) for x in messageList]) * 12
+        width = maxlen if maxlen > width else width
+        top = self.__createToplevel(height=height, width=width)
+        topFrame = ttk.Frame(top)
+        topFrame.pack(side="top", expand=1, fill="both")
+        bottomFrame = ttk.Frame(top)
+        bottomFrame.pack(side="bottom", expand=1, fill="both")
+        for x in messageList:
+            ttk.Label(
+                topFrame,
+                text=x,
+                justify="center",
+                anchor=CENTER,
+                font=("Copperplate Gothic Bold", 13),
+            ).pack(pady=10)
+
+        buttonValue = tk.BooleanVar()
+
+        buttonYes = ttk.Button(
+            bottomFrame, text="Yes", command=lambda: buttonValue.set(True)
+        )
+        buttonYes.pack(side="left", padx=6)
+
+        buttonNo = ttk.Button(
+            bottomFrame, text="No", command=lambda: buttonValue.set(False)
+        )
+        buttonNo.pack(side="right", padx=6)
+
+        buttonNo.wait_variable(buttonValue)
+
+        top.withdraw()
+        top.grab_release()
+        return buttonValue.get()
 
     def __createOptionsMenu(self, menubar: tk.Menu) -> tk.Menu:
         """Creates the Options Menu.
@@ -584,8 +612,7 @@ class Interface:
         Returns:
             tk.Toplevel: The created window.
         """
-        toplevel = self.__createToplevel(height=350)
-        toplevel.title("Options")
+        toplevel = self.__createToplevel(height=350, title="Options")
         top = ttk.Frame(toplevel)
         top.pack(side="top", expand=1, fill="both")
 
