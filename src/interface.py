@@ -46,7 +46,9 @@ class Interface:
         self.masterframe = tk.Tk()
         self.masterframe.protocol("WM_DELETE_WINDOW", self.__onClose)
         # self.masterframe.title("SMD Produktion")
-        # self.masterframe.geometry(self.__center_window(self.masterframe, 900, 570))
+        # self.masterframe.geometry(
+        #     self.__center_window(self.masterframe, width=1500, height=600)
+        # )
         self.masterframe.minsize(width=1500, height=600)
         self.masterframe.overrideredirect(True)
         if not exists(
@@ -197,6 +199,7 @@ class Interface:
             width,
             height,
             top.destroy,
+            isToplevel=True,
         )
         top.grab_set()
         return top
@@ -508,6 +511,7 @@ class Interface:
         master: tk.Frame,
         function: FunctionType,
         margin: int = None,
+        marginy: int = 0,
     ) -> tk.Button:
         """Creates a Button at the given position.
 
@@ -528,7 +532,14 @@ class Interface:
             text=text,
             command=lambda: self.__startThread(function),
         )
-        button.grid(in_=master, column=posX, row=posY, padx=(margin, 0), sticky="nsew")
+        button.grid(
+            in_=master,
+            column=posX,
+            row=posY,
+            padx=(margin, 0),
+            pady=marginy,
+            sticky="nsew",
+        )
 
     def __createLabel(self, posX: int, posY: int, text: str) -> tk.Label:
         """Creates a Label at the given position.
@@ -548,7 +559,9 @@ class Interface:
         """Creates the Inputs."""
         self.formbar = ttk.Frame(self.mainframe, height=100)
         self.formbar.pack(side="top", fill="both", pady=5)
-        ttk.Label(self.formbar, text="Start Date:").grid(row=0, column=4, sticky="nsew")
+        ttk.Label(self.formbar, text="Start Date:").grid(
+            row=0, column=4, sticky="nsew", padx=5
+        )
 
         ttk.Label(self.formbar, text="End Date:").grid(
             row=0, column=6, sticky="nsew", padx=5
@@ -580,6 +593,7 @@ class Interface:
             master=self.formbar,
             function=self.__trainModel,
             margin=50,
+            marginy=5,
         )
 
     def __showCal(self, i: str, posX: int, posY: int) -> tk.Toplevel:

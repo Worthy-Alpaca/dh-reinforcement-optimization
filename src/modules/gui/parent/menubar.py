@@ -14,6 +14,7 @@ def Titlebar(
     min_width,
     min_height,
     closeCommand,
+    isToplevel=False,
 ):
     # region Docstring
     """Creates a titlebar and basic window functions
@@ -135,7 +136,8 @@ def Titlebar(
     title_bar_title.bind("<Button-1>", get_pos)
 
     # Set up the window for minimizing functionality
-    root.bind("<FocusIn>", deminimize)
+    if not isToplevel:
+        root.bind("<FocusIn>", deminimize)
     root.after(10, lambda: set_appwindow(root))
 
     # region Set up resizing functionality
