@@ -1,22 +1,22 @@
 import tkinter as tk
 from tkinter import ttk
 from ctypes import windll
+from types import FunctionType
 
 
 def Titlebar(
-    root,
-    main_frame,
-    icon,
-    title_text,
-    minimize,
-    maximize,
-    close,
-    min_width,
-    min_height,
-    closeCommand,
-    isToplevel=False,
+    root: tk.Tk,
+    main_frame: ttk.Frame,
+    icon: tk.Image,
+    title_text: str,
+    minimize: bool,
+    maximize: bool,
+    close: bool,
+    min_width: int,
+    min_height: int,
+    closeCommand: FunctionType,
+    isToplevel: bool = False,
 ):
-    # region Docstring
     """Creates a titlebar and basic window functions
     Args:
         root (master): Root window for titlebar
@@ -29,7 +29,6 @@ def Titlebar(
         min_width (int): Minimum width of titlebar
         min_height (int): Minimum height of titlebar
     """
-    # endregion
 
     root.minimized = False  # only to know if root is minimized
     root.maximized = False  # only to know if root is maximized
@@ -180,7 +179,6 @@ def Titlebar(
                 pass
 
     resizey_widget.bind("<B1-Motion>", resizey)
-    # endregion
 
 
 # Menubar class creates a frame for the menubar which is accessed in the Menu class
