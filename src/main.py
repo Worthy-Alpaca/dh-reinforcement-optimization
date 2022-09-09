@@ -219,10 +219,12 @@ class RunModel:
 
         # summary(Q_net, (state_tsr.unsqueeze(0).shape, W.unsqueeze(0).shape))
         # with torch.no_grad():
-        #     self.writer.add_graph(Q_net, (state_tsr.unsqueeze(0), W.unsqueeze(0)))
+        #     self.writer.add_graph(
+        #         Q_net, (state_tsr.unsqueeze(0).detach(), W.unsqueeze(0).detach())
+        #     )
 
         if fname is not None:
-            info("Loading previous best previous model.")
+            info("Loading previous best model.")
             checkpoint = torch.load(fname)
             Q_net.load_state_dict(checkpoint["model"])
             optimizer.load_state_dict(checkpoint["optimizer"])
@@ -918,7 +920,7 @@ class RunModel:
         emb = int(fname[fname.index("emb") + 1])
         it = int(fname[fname.index("it") + 1])
 
-        print(
+        info(
             "shortest avg length found: {} with {} dimensions and {} iterations ".format(
                 shortest_fname.split(".tar")[0].split("_")[-1], emb, it
             )
