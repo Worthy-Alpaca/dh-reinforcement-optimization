@@ -15,7 +15,8 @@ proc set_theme {mode} {
             -disabledfg     "#ffffff"
             -disabledbg     "#737373"
             -selectfg       "#ffffff"
-            -selectbg       "#007fff"
+            -selectbg       "#E40520"
+            -bordercl       "#1f1e1e"
         }
         
         ttk::style configure . \
@@ -29,7 +30,8 @@ proc set_theme {mode} {
             -insertwidth 1 \
             -fieldbackground $colors(-selectbg) \
             -font {"Segoe Ui" 10} \
-            -borderwidth 1 \
+            -borderwidth 2 \
+            -bordercolor $colors(-bordercl) \
             -relief flat
 
         tk_setPalette background [ttk::style lookup . -background] \
@@ -54,7 +56,8 @@ proc set_theme {mode} {
             -disabledfg     "#737373"
             -disabledbg     "#ffffff"
             -selectfg       "#ffffff"
-            -selectbg       "#007fff"
+            -selectbg       "#E40520"
+            -bordercl       "#1f1e1e"
         }
 
 		ttk::style configure . \
@@ -68,7 +71,8 @@ proc set_theme {mode} {
             -insertwidth 1 \
             -fieldbackground $colors(-selectbg) \
             -font {"Segoe Ui" 10} \
-            -borderwidth 1 \
+            -borderwidth 2 \
+            -bordercolor $colors(-bordercl) \
             -relief flat
 
         tk_setPalette background [ttk::style lookup . -background] \
