@@ -4,6 +4,13 @@ from ctypes import windll
 from types import FunctionType
 
 
+#######################
+# Credit goes to PicoPlanetDev for the base of these Modules and rdbende for the design of the theme.
+# Modifications where made under the included MIT Licnese
+# https://github.com/PicoPlanetDev/Sun-Valley-titlebar/blob/a0f1efcbe1ca5858a26b469aaa28712244cefe02/LICENSE
+#######################
+
+
 def Titlebar(
     root: tk.Tk,
     main_frame: ttk.Frame,
