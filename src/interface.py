@@ -180,9 +180,24 @@ class Interface:
         y = (screen_height / 2) - (height / 2)
         return "%dx%d+%d+%d" % (width, height, x, y)
 
-    def __createToplevel(self, height=200, width=300) -> tk.Toplevel:
+    def __createToplevel(self, height=200, width=300, title="") -> tk.Toplevel:
         top = tk.Toplevel(self.mainframe)
         top.geometry(self.__center_window(self.masterframe, height=height, width=width))
+        top.minsize(width=width, height=height)
+        top.overrideredirect(True)
+        big_frame = ttk.Frame(top)
+        Titlebar(
+            top,
+            big_frame,
+            self.photo,
+            title,
+            False,
+            False,
+            True,
+            width,
+            height,
+            top.destroy,
+        )
         top.grab_set()
         return top
 
@@ -550,7 +565,7 @@ class Interface:
         Returns:
             tk.Toplevel: The created Calendar Toplevel
         """
-        top = self.__createToplevel(300, 350)
+        top = self.__createToplevel(400, 350)
         cal = Calendar(top, font="Arial 14", selectmode="day")
 
         def getDate(cal: Calendar):
@@ -569,7 +584,7 @@ class Interface:
         Returns:
             tk.Toplevel: The created window.
         """
-        toplevel = self.__createToplevel(height=250)
+        toplevel = self.__createToplevel(height=350)
         toplevel.title("Options")
         top = ttk.Frame(toplevel)
         top.pack(side="top", expand=1, fill="both")
