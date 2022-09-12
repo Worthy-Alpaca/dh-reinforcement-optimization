@@ -254,11 +254,11 @@ class KappaLoader:
         return self.getData()
 
     def getData(self):
-        warning("REMOVING THE FOLLOWING ITEMS FROM LIST DUE TO LACK OF REFERENCE DATA:")
+        rmData = self.data[~self.data["Material"].isin(self.referenceData)][
+            "Material"
+        ].tolist()
         warning(
-            self.data[~self.data["Material"].isin(self.referenceData)][
-                "Material"
-            ].tolist()
+            f"REMOVING THE FOLLOWING ITEMS FROM LIST DUE TO LACK OF REFERENCE DATA: {rmData} "
         )
         self.data = self.data[self.data["Material"].isin(self.referenceData)]
         sampleList = self.data["Material"].tolist()
