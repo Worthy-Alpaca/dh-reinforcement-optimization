@@ -12,3 +12,5 @@ tkcalendar==1.6.1
 torch==1.12.1+cu116
 torchinfo==1.7.0
 tqdm==4.64.0
+openpyxl==3.0.10
+odfpy==1.4.1
