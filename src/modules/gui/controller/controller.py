@@ -80,14 +80,18 @@ class Controller(MyCanvas):
         for x in solution:
             solutionListOG.append(coords[x][3:4][0])
 
+        t = 0
+        l = len(solutionListOG)
         if not validate:
             solutionList = self.__calcGroups(solutionListOG)
+            t = l - len(solutionList)
+            t = t * 20
         else:
             solutionList = solutionListOG
         SETUPMINUTES = 10
         # groupTimings = len(solutionList) * SETUPMINUTES * 60
         groupTimings = 0
-        textstr = f"{len(solutionList)} Groups\n"
+        textstr = f"{len(solutionList)} Groups\nSaved {t} Minutes with Grouping\n"
         testArr = []
         for x in solutionList:
             textstr += f"{x}\n"
