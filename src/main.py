@@ -895,6 +895,7 @@ class RunModel:
         plot: bool = False,
         numCarts: int = 6,
         sampleReqs: list = False,
+        modelFolder: Path = "",
     ):
         """Method to predict the best order of the given sample set
 
@@ -910,9 +911,11 @@ class RunModel:
         """
         self.numCarts = numCarts
         self.training = False
-        all_lengths_fnames = [
-            f for f in os.listdir(self.folder_name) if f.endswith(".tar")
-        ]
+
+        if modelFolder == "":
+            modelFolder = self.folder_name
+
+        all_lengths_fnames = [f for f in os.listdir(modelFolder) if f.endswith(".tar")]
         shortest_fname = sorted(
             all_lengths_fnames, key=lambda s: float(s.split(".tar")[0].split("_")[-1])
         )[0]
@@ -927,7 +930,7 @@ class RunModel:
         )
 
         Q_func, Q_net, optimizer, lr_scheduler = self.init_model(
-            os.path.join(self.folder_name, shortest_fname),
+            os.path.join(modelFolder, shortest_fname),
             EMBEDDING_DIMENSIONS=emb,
             EMBEDDING_ITERATIONS_T=it,
         )

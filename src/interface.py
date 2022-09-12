@@ -81,7 +81,8 @@ class Interface:
             self.photo = PhotoImage(
                 file=os.getcwd() + os.path.normpath("/src/assets/logo.gif")
             )
-
+        self.masterframe.iconphoto(True, self.photo)
+        self.masterframe.title("SMD Produktions Optimierung")
         Titlebar(
             self.masterframe,
             big_frame,
@@ -314,11 +315,16 @@ class Interface:
             endDate,
         )
         samples, sampleReqs = loader.getData()
+        if exists(self.basePath + os.path.normpath("/models")):
+            pathDir = self.basePath + os.path.normpath("/models")
+        else:
+            pathDir = self.resource_path("/bin/assets/models")
         best_value, best_solution = runmodel.getBestOder(
             sampleReqs=sampleReqs,
             samples=samples,
             plot=True,
             numCarts=self.config.getint("default", "numCarts"),
+            modelFolder=pathDir,
         )
         self.controller(
             best_value,
@@ -340,6 +346,7 @@ class Interface:
             np.random.seed(1000)
             torch.manual_seed(1000)
             torch.multiprocessing.set_start_method("spawn")
+            info("Starting training iteration.")
             runmodel = RunModel(
                 dbpath=self.config.get("optimizer_backend", "dbpath"),
                 numSamples=self.config.getint("default", "trainingSamples"),
