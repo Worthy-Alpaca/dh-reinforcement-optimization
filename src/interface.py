@@ -104,12 +104,12 @@ class Interface:
 
         # Create interface elements
         menubar = Menubar(self.masterframe)
-        menu = MenuCustom(menubar, "File")
-        menu.add_command("New", self.__new)
-        menu.add_command("Load", self.__openNew)
-        menu.add_command("Save", self.__saveAs)
+        menu = MenuCustom(menubar, "Datei")
+        menu.add_command("Neu", self.__new)
+        menu.add_command("Laden", self.__openNew)
+        menu.add_command("Speichern", self.__saveAs)
         menu.add_separator()
-        menu.add_command("Exit", self.__onClose)
+        menu.add_command("Beenden", self.__onClose)
         self.__createOptionsMenu(menubar)
 
         self.mainframe = ttk.Frame(
@@ -194,11 +194,9 @@ class Interface:
         return top
 
     def __findDBPath(self, basepath=False):
-        top = self.__createToplevel(150, 300, title="Options")
+        top = self.__createToplevel(150, 300, title="Optionen")
 
-        label = ttk.Label(
-            master=top, text="Please navigate to the product database file."
-        )
+        label = ttk.Label(master=top, text="Bitte navigieren Sie zur Datenbank Datei.")
         label.pack()
 
         basepath = basepath if basepath != False else self.basePath
@@ -250,8 +248,8 @@ class Interface:
     def __onClose(self, *args: any, **kwargs: any) -> None:
         """Closing Operation. Saves config variables to file."""
         if self.__askQuestion(
-            "Quit",
-            "Do you want to quit?",
+            "Beenden",
+            "Möchten Sie wirklich beenden?",
         ):
             path = self.basePath
 
@@ -286,8 +284,8 @@ class Interface:
             startDate = self.calDate["start"]
             endDate = self.calDate["end"]
         except:
-            self.controller.error("Please set a date range.")
-            return warning("Please set a date range.")
+            self.controller.error("Bitte setzten Sie eine Datumsspanne.")
+            return warning("Bitte setzten Sie eine Datumsspanne.")
 
         if self.optimizerData == None:
             datapath = self.__openNew(
@@ -299,7 +297,7 @@ class Interface:
         else:
             return
 
-        self.controller.wait(message="Generating Dataset")
+        self.controller.wait(message="Datenset generierung...")
 
         runmodel = RunModel(
             dbpath=self.config.get("optimizer_backend", "dbpath"),
@@ -337,8 +335,8 @@ class Interface:
 
     def __trainModel(self):
         if self.__askQuestion(
-            "Start Training",
-            "Do you really want to start a new training?\nThis can take up to several hours.",
+            "Training starten?",
+            "Möchten Sie wirklich ein neues Training starten?\nDies kann mehrere Stunden dauern.",
             height=200,
             width=400,
         ):
@@ -403,12 +401,12 @@ class Interface:
         buttonValue = tk.BooleanVar()
 
         buttonYes = ttk.Button(
-            bottomFrame, text="Yes", command=lambda: buttonValue.set(True)
+            bottomFrame, text="Ja", command=lambda: buttonValue.set(True)
         )
         buttonYes.pack(side="left", padx=6)
 
         buttonNo = ttk.Button(
-            bottomFrame, text="No", command=lambda: buttonValue.set(False)
+            bottomFrame, text="Nein", command=lambda: buttonValue.set(False)
         )
         buttonNo.pack(side="right", padx=6)
 
@@ -427,7 +425,7 @@ class Interface:
         Returns:
             tk.Menu: The created menu.
         """
-        filemenu = MenuCustom(menubar, "Options")
+        filemenu = MenuCustom(menubar, "Optionen")
         self.useIdealState = tk.BooleanVar()
         self.useIdealState.set(self.config.getboolean("default", "calcgroups"))
 
@@ -448,7 +446,7 @@ class Interface:
                 change_theme()
 
         filemenu.add_checkbutton(
-            label="Calculate Groups",
+            label="Gruppenkalkulation",
             var=self.useIdealState,
             command=lambda: updateConfig(
                 "default", "calcgroups", str(self.useIdealState.get())
@@ -457,7 +455,7 @@ class Interface:
         self.progressBar = tk.BooleanVar()
         self.progressBar.set(self.config.getboolean("default", "progressBar"))
         filemenu.add_checkbutton(
-            label="Disable Progressbars",
+            label="Fortschrittbalken ausblenden",
             var=self.progressBar,
             command=lambda: updateConfig(
                 "default", "progressBar", str(self.progressBar.get())
@@ -467,7 +465,7 @@ class Interface:
         self.useCache = tk.BooleanVar()
         self.useCache.set(self.config.getboolean("default", "useCache"))
         filemenu.add_checkbutton(
-            label="Use Cached Data",
+            label="Cache Daten verwenden",
             var=self.useCache,
             command=lambda: updateConfig(
                 "default", "useCache", str(self.useCache.get())
@@ -477,7 +475,7 @@ class Interface:
         self.useDarkmode = tk.BooleanVar()
         self.useDarkmode.set(self.config.getboolean("default", "darkmode"))
         filemenu.add_checkbutton(
-            label="Use Darkmode",
+            label="Darkmode",
             var=self.useDarkmode,
             command=lambda: updateConfig(
                 "default", "darkmode", str(self.useDarkmode.get())
@@ -486,12 +484,12 @@ class Interface:
 
         filemenu.add_separator()
         filemenu.add_command(
-            label="Change Database File",
+            label="Datenbankdatei austauschen",
             command=lambda: self.__findDBPath(
                 self.config.get("optimizer_backend", "dbpath")
             ),
         )
-        filemenu.add_command(label="Options", command=self.__setOptions)
+        filemenu.add_command(label="Optionen", command=self.__setOptions)
 
     def __createButton(
         self,
@@ -549,29 +547,33 @@ class Interface:
         """Creates the Inputs."""
         self.formbar = ttk.Frame(self.mainframe, height=100)
         self.formbar.pack(side="top", fill="both", pady=5)
-        ttk.Label(self.formbar, text="Start Date:").grid(
+        ttk.Label(self.formbar, text="Start Datum:").grid(
             row=0, column=4, sticky="nsew", padx=5
         )
 
-        ttk.Label(self.formbar, text="End Date:").grid(
+        ttk.Label(self.formbar, text="End Datum:").grid(
             row=0, column=6, sticky="nsew", padx=5
         )
 
         self.__createButton(
             5,
             0,
-            "Select",
+            "Auswählen",
             self.formbar,
             function=lambda: self.__showCal("start", 5, 1),
         )
         self.__createButton(
-            7, 0, "Select", self.formbar, function=lambda: self.__showCal("end", 7, 1)
+            7,
+            0,
+            "Auswählen",
+            self.formbar,
+            function=lambda: self.__showCal("end", 7, 1),
         )
 
         self.__createButton(
             8,
             0,
-            text="Optimize",
+            text="Optimieren",
             master=self.formbar,
             function=self.__optimize,
             margin=50,
@@ -579,7 +581,7 @@ class Interface:
         self.__createButton(
             8,
             1,
-            text="Train Model",
+            text="Model trainieren",
             master=self.formbar,
             function=self.__trainModel,
             margin=50,
@@ -608,7 +610,7 @@ class Interface:
             info(f"Successfully set {cal.selection_get()} as {i} Date")
 
         cal.pack(fill="both", expand=True)
-        ttk.Button(top, text="ok", command=lambda: getDate(cal)).pack()
+        ttk.Button(top, text="OK", command=lambda: getDate(cal)).pack()
 
     def __setOptions(self) -> tk.Toplevel:
         """Creates window for option management.
@@ -616,7 +618,7 @@ class Interface:
         Returns:
             tk.Toplevel: The created window.
         """
-        toplevel = self.__createToplevel(height=350, title="Options")
+        toplevel = self.__createToplevel(height=400, title="Optionen")
         top = ttk.Frame(toplevel)
         top.pack(side="top", expand=1, fill="both")
 
@@ -624,6 +626,7 @@ class Interface:
             numCart = numCarts.get()
             trainingSamp = trainingSamples.get()
             address = overlapThreshhold.get()
+            address = address.replace(",", ".")
             self.config.set("default", "numCarts", str(numCart))
             self.config.set("default", "trainingSamples", str(trainingSamp))
             self.config.set("optimizer_backend", "overlapThreshhold", str(address))
@@ -634,17 +637,21 @@ class Interface:
             toplevel.grab_release()
             return True
 
-        ttk.Label(top, text="Number of Samples to use in training").pack(pady=5)
+        ttk.Label(top, text="Anzahl an Samples für Training").pack(pady=5)
+        ttk.Label(top, text="Muss eine Ganzzahl sein.", font=("", 10, "italic")).pack()
         trainingSamples = tk.IntVar()
         trainingSamples.set(self.config.getint("default", "trainingSamples"))
         ttk.Entry(top, textvariable=trainingSamples).pack(pady=5)
-
-        ttk.Label(top, text="Number of Carts available").pack(pady=5)
+        ttk.Label(top, text="Verfügbare Anzahl an Rüstwagen").pack(pady=5)
+        ttk.Label(top, text="Muss eine Ganzzahl sein.", font=("", 10, "italic")).pack()
         numCarts = tk.IntVar()
         numCarts.set(self.config.getint("default", "numCarts"))
         ttk.Entry(top, textvariable=numCarts).pack(pady=5)
 
-        ttk.Label(top, text="Overlap Threshhold").pack(pady=5)
+        ttk.Label(top, text="Überschneidungsschwelle").pack(pady=5)
+        ttk.Label(
+            top, text="Muss eine Dezimalzahl unter 1 sein.", font=("", 10, "italic")
+        ).pack()
         overlapThreshhold = tk.StringVar()
         overlapThreshhold.set(self.config.get("optimizer_backend", "overlapThreshhold"))
         ttk.Entry(top, textvariable=overlapThreshhold).pack(pady=5)
