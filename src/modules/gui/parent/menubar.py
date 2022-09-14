@@ -35,6 +35,8 @@ def Titlebar(
         close (bool): Should a close button be created?
         min_width (int): Minimum width of titlebar
         min_height (int): Minimum height of titlebar
+        closeCommand (FunctionType): Function to execute on close
+        isToplevel (bool): If this titlebar is used in a toplevel. Defaults to False
     """
 
     root.minimized = False  # only to know if root is minimized
@@ -188,18 +190,24 @@ def Titlebar(
     resizey_widget.bind("<B1-Motion>", resizey)
 
 
-# Menubar class creates a frame for the menubar which is accessed in the Menu class
 class Menubar:
     def __init__(self, root):
+        """Menubar class creates a frame for the menubar which is accessed in the Menu class
+        Args:
+            root (master): Root window for Menubar.
+        """
         self.root = root
         self.menubar_frame = ttk.Frame(root)
         self.menubar_frame.pack(fill=tk.X, pady=(0, 10))
 
 
-# Adds a menubutton to the menubar frame with the text header
-# And allows for the menu to be populated with commands and separators
 class MenuCustom:
     def __init__(self, menubar, header):
+        """Adds a menubutton to the menubar frame with the text header and allows for the menu to be populated with commands and separators
+        Args:
+            menubar: Root menubar.
+            header: Name of the menubar.
+        """
         self.menu = tk.Menu(menubar.menubar_frame)
         self.menubutton = ttk.Menubutton(
             menubar.menubar_frame, text=header, menu=self.menu, direction="below"
@@ -207,13 +215,16 @@ class MenuCustom:
         self.menubutton.pack(side=tk.LEFT, padx=(10, 0))
 
     def add_command(self, label, command=None):
+        """Add a command to the created menu."""
         if command != None:
             self.menu.add_command(label=label, command=command)
         else:
             self.menu.add_command(label=label)
 
     def add_checkbutton(self, label, var, command):
+        """Add a checkbutton to the created menu."""
         self.menu.add_checkbutton(label=label, var=var, command=command)
 
     def add_separator(self):
+        """Add a separator to the created menu."""
         self.menu.add_separator()
