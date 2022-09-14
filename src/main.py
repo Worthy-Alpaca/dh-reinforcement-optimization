@@ -660,7 +660,6 @@ class RunModel:
             BATCH_SIZE (int): The current batch size.
             GAMMA (float): The current gamma value.
         """
-        found_solutions = dict()  # episode --> (coords, W, solution)
         self.training = True
         self.losses = []
         self.lrs = []
