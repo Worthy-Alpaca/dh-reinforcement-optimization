@@ -2,7 +2,6 @@ import sys
 import os
 import json
 import configparser
-import requests
 import threading
 import torch
 import random
@@ -15,10 +14,9 @@ from types import FunctionType
 from tkinter import Grid, filedialog, PhotoImage, ttk
 from tkcalendar import Calendar
 from os.path import exists
-from logging import error, info, warning
+from logging import info, warning
 
 from misc.dataloader import KappaLoader
-from validate import Validate
 
 
 PACKAGE_PARENT = "../"
@@ -31,7 +29,6 @@ from main import RunModel
 from helper import TextRedirector
 
 try:
-    from src.modules.gui.parent.canvas import MyCanvas
     from src.modules.gui.controller.controller import Controller
     from src.modules.gui.parent.menubar import Titlebar, Menubar, MenuCustom
 except:
@@ -353,7 +350,6 @@ class Interface:
             EMBEDDING_DIMENSIONS = 10
             EMBEDDING_ITERATIONS_T = 2
             Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
-                # fname=os.path.join(runmodel.folder_name, shortest_fname),
                 EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
                 EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
                 OPTIMIZER=torch.optim.Adam,
@@ -384,7 +380,7 @@ class Interface:
         messageList = message.split("\n")
         maxlen = max([len(x) for x in messageList]) * 12
         width = maxlen if maxlen > width else width
-        top = self.__createToplevel(height=height, width=width)
+        top = self.__createToplevel(height=height, width=width, title=title)
         topFrame = ttk.Frame(top)
         topFrame.pack(side="top", expand=1, fill="both")
         bottomFrame = ttk.Frame(top)
