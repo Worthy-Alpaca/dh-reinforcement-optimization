@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-import math
 from scipy.spatial import distance_matrix
 
 
