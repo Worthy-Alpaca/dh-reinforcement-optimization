@@ -628,7 +628,7 @@ class Interface:
             self.config.set("optimizer_backend", "overlapThreshhold", str(address))
             info(f"Successfully set trainingSamples to {str(trainingSamp)} ")
             info(f"Successfully set numCarts to {str(numCart)} ")
-            info(f"Successfully set overlapThreshhold to {str(address)} ")
+            info(f"Successfully set overlapThreshhold to {str(float(address) * 100)}% ")
             toplevel.withdraw()
             toplevel.grab_release()
             return True
