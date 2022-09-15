@@ -26,17 +26,9 @@ class QFunction:
 
     def get_best_action(self, state_tsr, state):
         W = state.W
-        if torch.any(torch.isnan(W)):
-            print()
-        if torch.any(torch.isnan(state_tsr)):
-            print()
 
         estimated_rewards = self.predict(state_tsr, W)  # size (nr_nodes,)
 
-        if torch.any(torch.isnan(estimated_rewards)):
-            print()
-            estimated_rewards = torch.nan_to_num(estimated_rewards)
-            print()
         sorted_reward_idx = estimated_rewards.argsort(descending=True)
         solution = state.partial_solution
 
@@ -47,15 +39,12 @@ class QFunction:
                 len(solution) == 0 or W[solution[-1], idx] >= 0
             ) and idx not in already_in:
                 return idx, estimated_rewards[idx].item()
-        # print("here get best action")
         return 0, 0
 
     def batch_update(self, states_tsrs, Ws, actions, targets):
         Ws_tsr = torch.stack(Ws).to(self.device)
         xv = torch.stack(states_tsrs).to(self.device)
         self.optimizer.zero_grad(set_to_none=True)
-        # for param in self.model.parameters():
-        #     param.grad = None
 
         if None in actions:
             for i in actions:
@@ -77,7 +66,6 @@ class QFunction:
         loss.backward()
         self.optimizer.step()
         self.lr_scheduler.step()
-        # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
 
         return loss_val
 
@@ -124,7 +112,6 @@ class UtilFunctions:
         r1 = 0
         t1 = 0
         for step in range(len(solution) - 1):
-            # MAYBE ALSO CALCULATE THE OVERLAP TO THE NEXT NEXT PRODUCT
             idx1, idx2 = solution[step], solution[step + 1]
             c1 = self.coords[idx1]
             c2 = self.coords[idx2]
@@ -133,7 +120,6 @@ class UtilFunctions:
             r1 += Cartsetup(c1)
             total_overlap += Cartsetup(overlapComponents)
             del c1, c2
-        # total_time = t1 + r1
         return total_overlap, t1
 
     def total_distance(self, solution: list, W):
@@ -183,7 +169,6 @@ class UtilFunctions:
 def Cartsetup(comps: list):
     time = 0
 
-    # print(f"Setting up Cart {cart} with {len(self.feedcart[key])} components")
     complexity = len(comps) / 36
     for i in range(len(comps)):
         time = (60 + random.randint(0, 0) * complexity + 9.8) + time
