@@ -216,16 +216,6 @@ class DataBaseLoader:
 
             self.score = score
 
-            # tableName = f"{product}_{machine}_components"
-            # self.components = pd.read_sql_table(tableName, connection)
-            # tableName = f"{product}_{machine}_offsets"
-            # offsets = pd.read_sql_table(tableName, connection)
-            # offsetList = []
-            # for i, r in offsets.iterrows():
-            #     currentOffset = (r.x, r.y)
-            #     offsetList.append(currentOffset)
-            # self.offsets = offsetList
-
     def __call__(self):
         return (self.data, self.components, self.offsets, self.score)
 
