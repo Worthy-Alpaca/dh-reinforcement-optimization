@@ -15,17 +15,11 @@ class ProductDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
-        # hier index ziehen
         x = self.components[index]
         return x, self.data[index]
-        
 
 
 class ProductDataloader(DataLoader):
     def __iter__(self):
-         for batch in super().__iter__():
-            # print(batch)
-            # test = self.sampler.data_source.refData
+        for batch in super().__iter__():
             yield batch[1], distance_matrix(batch[1], batch[1]), batch[0]
-
-    
