@@ -32,18 +32,10 @@ from misc.deploy import DeployModel
 from torch.utils.data.dataloader import default_collate
 from torch.profiler import profile, record_function, ProfilerActivity
 
-"""PACKAGE_PARENT = "../"
-SCRIPT_DIR = os.path.dirname(
-    os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__)))
-)
-sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))"""
 from helper import Memory, UtilFunctions, Cartsetup, Coating
 
 from misc.dataloader import DataLoader, DataBaseLoader, KappaLoader
 from misc.dataset import ProductDataloader, ProductDataset
-
-# from src.helper.dataloader import DataLoader
-# from helper.deploy import DeployModel
 
 
 class RunModel:
@@ -144,7 +136,6 @@ class RunModel:
                     overallTime += self.model.predict(predArray).item()
                 overallTime = overallTime / 2
                 overallTime += Coating(Ymax * rowOffsets)
-                # overallTime += Cartsetup(components)
                 overallLen += len(data) * rowOffsets
 
                 comps = [compData.index(x.strip()) for x in components]
@@ -217,12 +208,6 @@ class RunModel:
         )
         state_tsr = self.state2tens(current_state)
 
-        # summary(Q_net, (state_tsr.unsqueeze(0).shape, W.unsqueeze(0).shape))
-        # with torch.no_grad():
-        #     self.writer.add_graph(
-        #         Q_net, (state_tsr.unsqueeze(0).detach(), W.unsqueeze(0).detach())
-        #     )
-
         if fname is not None:
             info("Loading previous best model.")
             checkpoint = torch.load(fname)
@@ -292,8 +277,6 @@ class RunModel:
 
         if not validate:
             solutionList = self.calcGroups(solutionList)
-        SETUPMINUTES = 10
-        # groupTimings = len(solutionList) * SETUPMINUTES * 60
         groupTimings = 0
         textstr = f"{len(solutionList)} Groups\n"
         testArr = []
@@ -311,12 +294,6 @@ class RunModel:
         ax = fig.add_subplot(122)
         ax.axis("off")
         plot.scatter(coords[:, 0], coords[:, 1], coords[:, 2])
-
-        # for i, label in enumerate(labels):
-        #     x = coords[:, 0][i]
-        #     y = coords[:, 1][i]
-        #     z = coords[:, 2][i]
-        #     plot.annotate(label, (x, y, z))
 
         n = len(coords)
 
@@ -354,8 +331,6 @@ class RunModel:
             ylabel="Number of Components",
             zlabel="Cumulative Component Score",
         )
-        # plot.xlabel("Number of placements")
-        # plot.ylabel("Number of Components")
         plot.plot(
             coords[solution[0], 0],
             coords[solution[0], 1],
@@ -472,7 +447,7 @@ class RunModel:
             lettersIndexes.reverse()
             sampleReqs.insert(lettersIndexes[0], runningReqs)
             sampleSize.insert(lettersIndexes[0], x)
-        # sampleSize = list(set(sampleSize))
+
         def createCoords(sampleSize):
 
             globalList = {}
@@ -514,7 +489,6 @@ class RunModel:
             )
             supplement = supplement + sampleSize
             globalList = createCoords(supplement)
-            # globalList = dict(globalList, **supplement)
 
         product, coords = random.choice(list(globalList.items()))
 
@@ -522,60 +496,10 @@ class RunModel:
             npArray.append(i)
 
         coords = np.asarray(coords, dtype=object)
-        # test = coords[:, :3].astype(np.float32)
         W_np = distance_matrix(
             coords[:, :3].astype(np.float32), coords[:, :3].astype(np.float32)
         )
-        # test = self.distance_matrix(coords)
-        # if W_np.shape != (self.numSamples, self.numSamples):
-        #     print()
         return coords, W_np, product
-
-    def distance_matrix(self, coords: np.ndarray):
-        """Create a custom distance matrix based on provided coordinate set.
-
-        Args:
-            coords (np.ndarray): The given coordinate set.
-
-        Returns:
-            np.ndarray: The created matrix.
-        """
-        nextItems = coords.copy()
-        global_matrix = []
-        for i in range(len(coords)):
-            running_matrix = []
-            numPlacements = coords[i][0]
-            numComps = coords[i][1]
-            product = coords[i][2]
-            components = coords[i][3]
-            assemblyTime = coords[i][5]
-            productRequirement = coords[i][6]
-            setupTime = Cartsetup(components)
-            assemblyTime = assemblyTime * productRequirement
-            for j in range(len(coords)):
-                numPlacementsNext = coords[j][0]
-                numCompsNext = coords[j][1]
-                productNext = coords[j][2]
-                componentsNext = coords[j][3]
-                assemblyTimeNext = coords[j][5]
-                productRequirementNext = coords[j][6]
-                setupTimeNext = Cartsetup(componentsNext)
-                assemblyTimeNext = assemblyTimeNext * productRequirementNext
-
-                overlap = list(set(components) & set(componentsNext))
-                overlapTime = Cartsetup(overlap)
-                if product == productNext:
-                    timeDifference = 0
-                else:
-                    timeDifference = (setupTimeNext - overlapTime + setupTime) + (
-                        assemblyTimeNext - assemblyTime
-                    )
-                running_matrix.append(timeDifference)
-                # running_matrix.append(math.sqrt(timeDifference**2))
-
-            global_matrix.append(running_matrix)
-
-        return np.asarray(global_matrix)
 
     def get_graph_mat(self, n=10, size=1):
         """Throws n nodes uniformly at random on a square, and build a (fully connected) graph.
@@ -615,7 +539,6 @@ class RunModel:
                 ]
             )
             del req, simTime, currentList
-        # self.refData = np.asarray(currentDict)
         currentDict = np.asarray(currentDict, dtype=object)
         clist = []
         for c in currentDict:
@@ -665,10 +588,8 @@ class RunModel:
         self.lrs = []
         self.path_lengths = []
         current_min_med_length = float("inf")
-        # torch.backends.cudnn.benchmark = True
         Q_net = Q_net.float()
         BATCH_SIZE = self.numSamples
-        # data, clist = self.generateData()
         productDataset = ProductDataset(*self.generateData())
         productDataloader = ProductDataloader(
             productDataset,
@@ -732,9 +653,6 @@ class RunModel:
                 next_solution = solution + [next_node]
 
                 # reward observed for taking this step
-                # rwNext, next_solution = self.helper.total_distance(next_solution, W)
-                # rwNow, solution = self.helper.total_distance(solution, W)
-                # reward = -(rwNext - rwNow)
                 reward = -(
                     self.helper.total_distance(next_solution, W)[0]
                     - self.helper.total_distance(solution, W)[0]
@@ -751,9 +669,7 @@ class RunModel:
                 states.append(next_state)
                 states_tsrs.append(next_state_tsr)
                 rewards.append(reward)
-                # rewards = torch.cat((rewards, reward), -1)
                 actions.append(next_node)
-                # actions = torch.cat(actions, next_node)
 
                 # store our experience in memory, using n-step Q-learning:
                 if len(solution) >= N_STEP_QL:
@@ -794,7 +710,6 @@ class RunModel:
                     batch_states_tsrs = [e.state_tsr for e in experiences]
                     batch_Ws = [e.state.W for e in experiences]
                     batch_actions = [e.action for e in experiences]
-                    # batch_targets = torch.zeros(0, device=self.device)
                     batch_targets = []
 
                     for i, experience in enumerate(experiences):
@@ -804,11 +719,9 @@ class RunModel:
                                 experience.next_state_tsr, experience.next_state
                             )
                             target += GAMMA * best_reward
-                        # batch_targets = torch.cat((batch_targets, target), -1)
                         batch_targets.append(target)
                         del target
 
-                    # print("batch targets: {}".format(batch_targets))
                     loss = Q_func.batch_update(
                         batch_states_tsrs, batch_Ws, batch_actions, batch_targets
                     )
@@ -818,7 +731,6 @@ class RunModel:
                     self.writer.add_scalar(
                         "LearningRate", Q_func.optimizer.param_groups[0]["lr"], t
                     )
-                    # trial.report(loss, step)
                     med_length = np.median(self.path_lengths[-100:])
                     if med_length < current_min_med_length:
                         current_min_med_length = med_length
@@ -849,8 +761,6 @@ class RunModel:
             if trial.should_prune():
                 self.writer.close()
                 raise optuna.exceptions.TrialPruned()
-            # prof.step()
-            # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
         return np.median(
             np.convolve(np.array(self.losses), np.ones((100,)) / 100, mode="valid")
         )
@@ -890,7 +800,7 @@ class RunModel:
 
     def getBestOder(
         self,
-        samples: list,
+        samples: list = False,
         plot: bool = False,
         numCarts: int = 6,
         sampleReqs: list = False,
@@ -936,7 +846,6 @@ class RunModel:
         best_solution = {}
         best_value = float("inf")
 
-        # for i in samples:
         coords, W_np, _ = self.getData(samples=samples, sampleReqsList=sampleReqs)
         clist = []
         for c in coords:
@@ -952,9 +861,6 @@ class RunModel:
         )
         components = torch.from_numpy(components)
         self.helper = UtilFunctions(components)
-        # plot_graph(coords, 1)
-        # plt.show()
-        # coords, W_np = get_graph_mat(n=NR_NODES)
         W = torch.tensor(
             W_np, dtype=torch.float32, requires_grad=False, device=self.device
         )
@@ -1024,12 +930,12 @@ if __name__ == "__main__":
     START_TIME = time.perf_counter()
     EMBEDDING_DIMENSIONS = 16
     EMBEDDING_ITERATIONS_T = 2
-    runmodel = RunModel(
-        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
-        numSamples=16,
-        tuning=False,
-        allowDuplicates=False,
-    )
+    # runmodel = RunModel(
+    #     dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
+    #     numSamples=16,
+    #     tuning=False,
+    #     allowDuplicates=False,
+    # )
 
     # all_lengths_fnames = [
     #     f for f in os.listdir(runmodel.folder_name) if f.endswith(".tar")
@@ -1041,27 +947,26 @@ if __name__ == "__main__":
     # emb = int(fname[fname.index("emb") + 1])
     # it = int(fname[fname.index("it") + 1])
 
-    Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
-        # fname=os.path.join(runmodel.folder_name, shortest_fname),
-        EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
-        EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
-        OPTIMIZER=torch.optim.Adam,
-    )
-    runmodel.fit(
-        Q_func=Q_Function,
-        Q_net=QNet,
-        optimizer=Adam,
-        lr_scheduler=ExponentialLR,
-        NR_EPISODES=1000,  # die sind noch über, bestes modell laden
-        MIN_EPSILON=0.7,
-        EPSILON_DECAY_RATE=6e-4,
-        N_STEP_QL=4,
-        BATCH_SIZE=16,
-        GAMMA=0.7,
-    )
+    # Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
+    #     # fname=os.path.join(runmodel.folder_name, shortest_fname),
+    #     EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
+    #     EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
+    #     OPTIMIZER=torch.optim.Adam,
+    # )
+    # runmodel.fit(
+    #     Q_func=Q_Function,
+    #     Q_net=QNet,
+    #     optimizer=Adam,
+    #     lr_scheduler=ExponentialLR,
+    #     NR_EPISODES=1000,  # die sind noch über, bestes modell laden
+    #     MIN_EPSILON=0.7,
+    #     EPSILON_DECAY_RATE=6e-4,
+    #     N_STEP_QL=4,
+    #     BATCH_SIZE=16,
+    #     GAMMA=0.7,
+    # )
 
     END_TIME = time.perf_counter() - START_TIME
-    print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
 
     path = Path(os.getcwd() + os.path.normpath("/2days.xlsx"))
 
@@ -1070,22 +975,22 @@ if __name__ == "__main__":
         dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
     )
 
-    samples, sampleReqs = loader()
+    # samples, sampleReqs = loader()
     runmodel = RunModel(
         dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
-        numSamples=len(samples),
+        numSamples=300,
         tuning=False,
         allowDuplicates=True,
+        overwriteDevice="cpu",
     )
 
-    best_value, best_solution = runmodel.getBestOder(
-        sampleReqs=sampleReqs, samples=samples, plot=True, numCarts=3
-    )
+    best_value, best_solution = runmodel.getBestOder(plot=True, numCarts=3)
+    print(f"This run took {END_TIME} seconds | {END_TIME / 60} Minutes")
     validate = Validate(
         best_value,
         best_solution,
         dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
-        calcGroups=True,
+        calcGroups=False,
         overlapThreshhold=0.5,
     )
     validate.plotSoltions()
