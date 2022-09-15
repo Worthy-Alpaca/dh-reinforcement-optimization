@@ -3,7 +3,7 @@ import tkinter as tk
 import numpy as np
 from sqlalchemy import create_engine
 from logging import info
-from helper import Memory, UtilFunctions, Cartsetup, Coating
+from helper import UtilFunctions
 from matplotlib.pyplot import style
 
 try:
@@ -88,8 +88,6 @@ class Controller(MyCanvas):
             t = t * 20
         else:
             solutionList = solutionListOG
-        SETUPMINUTES = 10
-        # groupTimings = len(solutionList) * SETUPMINUTES * 60
         groupTimings = 0
         textstr = f"{len(solutionList)} Groups\nSaved {t} Minutes with Grouping\n"
         testArr = []
@@ -188,7 +186,6 @@ class Controller(MyCanvas):
 
         style.use("ggplot")
         waitPlot.axis("off")
-        # waitPlot.set_title("Loading...", color="green")
         waitPlot.text(
             0.5,
             0.5,
@@ -212,7 +209,6 @@ class Controller(MyCanvas):
 
         style.use("ggplot")
         errorPlot.axis("off")
-        # errorPlot.set_title(f"An error occured: {error} ", color="red")
         errorPlot.text(
             0.5,
             0.5,
@@ -246,7 +242,6 @@ class Controller(MyCanvas):
             except:
                 ComponentsNext = []
             overlapComponents = list(set(Components) & set(ComponentsNext))
-            x = len(overlapComponents) / len(Components)
             if len(overlapComponents) / len(Components) < self.overlapThreshhold:
                 solutionListRunning.append(product)
                 solutionListReturn.append(solutionListRunning.copy())
@@ -259,7 +254,6 @@ class Controller(MyCanvas):
                 runningSlots += numComponents
                 solutionListRunning.append(product)
             else:
-                # runningSlots = 0
                 solutionListReturn.append(solutionListRunning.copy())
                 solutionListRunning.clear()
                 solutionListRunning.append(product)
