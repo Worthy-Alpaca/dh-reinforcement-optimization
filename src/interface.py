@@ -230,7 +230,7 @@ class Interface:
         self.config.set("default", "calcgroups", "false")
         self.config.set("default", "useCache", "true")
         self.config.set("default", "numCarts", "3")
-        self.config.set("default", "progressBar", "false")
+        self.config.set("default", "progressBar", "True")
         self.config.set("default", "trainingSamples", "13")
         self.config.set("default", "darkmode", "true")
         self.config.add_section("optimizer_backend")
