@@ -9,7 +9,6 @@ class MyCanvas(tk.Canvas):
         super().__init__(master, **kwargs)
         """Creates the canvas on which to draw"""
         self.mainframe = master
-        # self.figure = Figure(figsize=(11.6, 6.5), dpi=100)
         self.figure = Figure(dpi=100)
         self.canvas = FigureCanvasTkAgg(self.figure, master=self.mainframe)
         self.bind("<Configure>", self.__on_resize)
