@@ -747,23 +747,12 @@ class RunModel:
             self.path_lengths.append(length)
             self.writer.add_scalar("Pathlength", length, episode)
             self.__createTensorboardLogs(Q_net, episode)
-            if len(self.losses) < 1:
-                trial.report(-1.0, episode)
-            else:
-                trial.report(
-                    np.median(
-                        np.convolve(
-                            np.array(self.losses), np.ones((100,)) / 100, mode="valid"
-                        )
-                    ),
-                    episode,
-                )
-            if trial.should_prune():
-                self.writer.close()
-                raise optuna.exceptions.TrialPruned()
-        return np.median(
-            np.convolve(np.array(self.losses), np.ones((100,)) / 100, mode="valid")
-        )
+            if trial is not None:
+                trial.report(length, episode)
+                if trial.should_prune():
+                    self.writer.close()
+                    raise optuna.exceptions.TrialPruned()
+        return current_min_med_length
 
     def __createTensorboardLogs(self, model: nn.Module, epoch):
         for name, module in model.named_children():
@@ -831,12 +820,6 @@ class RunModel:
         fname = shortest_fname.split("_")
         emb = int(fname[fname.index("emb") + 1])
         it = int(fname[fname.index("it") + 1])
-
-        info(
-            "shortest avg length found: {} with {} dimensions and {} iterations ".format(
-                shortest_fname.split(".tar")[0].split("_")[-1], emb, it
-            )
-        )
 
         Q_func, Q_net, optimizer, lr_scheduler = self.init_model(
             os.path.join(modelFolder, shortest_fname),
