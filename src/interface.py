@@ -232,6 +232,7 @@ class Interface:
         self.config.set("default", "progressBar", "True")
         self.config.set("default", "trainingSamples", "13")
         self.config.set("default", "darkmode", "true")
+        self.config.set("default", "solutionIterator", "10")
         self.config.add_section("optimizer_backend")
         self.config.set("optimizer_backend", "dbpath", "")
         self.config.set("optimizer_backend", "overlapThreshhold", "0.5")
@@ -319,7 +320,7 @@ class Interface:
         best_time = -float("inf")
         best_value = any
         best_solution = any
-        for x in range(10):
+        for x in range(self.config.getint("default", "solutionIterator")):
             running_value, running_solution = runmodel.getBestOder(
                 sampleReqs=sampleReqs,
                 samples=samples,
@@ -674,7 +675,7 @@ class Interface:
         Returns:
             tk.Toplevel: The created window.
         """
-        toplevel = self.__createToplevel(height=400, title="Optionen")
+        toplevel = self.__createToplevel(height=500, title="Optionen")
         top = ttk.Frame(toplevel)
         top.pack(side="top", expand=1, fill="both")
 
@@ -682,13 +683,16 @@ class Interface:
             numCart = numCarts.get()
             trainingSamp = trainingSamples.get()
             address = overlapThreshhold.get()
+            solutionIt = solutionIterator.get()
             address = address.replace(",", ".")
             self.config.set("default", "numCarts", str(numCart))
             self.config.set("default", "trainingSamples", str(trainingSamp))
+            self.config.set("default", "solutionIterator", str(solutionIt))
             self.config.set("optimizer_backend", "overlapThreshhold", str(address))
             info(f"Successfully set trainingSamples to {str(trainingSamp)} ")
             info(f"Successfully set numCarts to {str(numCart)} ")
             info(f"Successfully set overlapThreshhold to {str(float(address) * 100)}% ")
+            info(f"Successfully set solutionIterator to {str(solutionIt)} ")
             toplevel.withdraw()
             toplevel.grab_release()
             return True
@@ -711,6 +715,12 @@ class Interface:
         overlapThreshhold = tk.StringVar()
         overlapThreshhold.set(self.config.get("optimizer_backend", "overlapThreshhold"))
         ttk.Entry(top, textvariable=overlapThreshhold).pack(pady=5)
+
+        ttk.Label(top, text="Anzahl der Optimierungs Iterationen").pack(pady=5)
+        ttk.Label(top, text="Muss eine Ganzzahl sein.", font=("", 10, "italic")).pack()
+        solutionIterator = tk.IntVar()
+        solutionIterator.set(self.config.get("default", "solutionIterator"))
+        ttk.Entry(top, textvariable=solutionIterator).pack(pady=5)
 
         ttk.Button(top, text="OK", command=callback).pack(pady=5)
 
