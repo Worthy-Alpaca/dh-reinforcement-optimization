@@ -105,8 +105,7 @@ class Interface:
         menubar = Menubar(self.masterframe)
         menu = MenuCustom(menubar, "Datei")
         menu.add_command("Neu", self.__new)
-        menu.add_command("Laden", self.__openNew)
-        menu.add_command("Speichern", self.__saveAs)
+        menu.add_command("Laden", self.__findDBPath)
         menu.add_separator()
         menu.add_command("Beenden", self.__onClose)
         self.__createOptionsMenu(menubar)
@@ -175,7 +174,12 @@ class Interface:
         top.geometry(self.__center_window(self.masterframe, height=height, width=width))
         top.minsize(width=width, height=height)
         top.overrideredirect(True)
-        big_frame = ttk.Frame(top)
+        top.config(
+            highlightbackground="#1f1e1e",
+            highlightthickness=2,
+            highlightcolor="#1f1e1e",
+        )
+        big_frame = ttk.Frame(top, relief=RAISED)
         Titlebar(
             top,
             big_frame,
@@ -285,7 +289,7 @@ class Interface:
             endDate = self.calDate["end"]
         except:
             self.controller.error("Bitte setzten Sie eine Datumsspanne.")
-            return warning("Bitte setzten Sie eine Datumsspanne.")
+            return warning("Please set a date range.")
 
         if self.optimizerData == None:
             datapath = self.__openNew(
