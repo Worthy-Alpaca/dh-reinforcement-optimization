@@ -1,5 +1,6 @@
 import random
 import tkinter as tk
+import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
 from logging import info
@@ -221,6 +222,12 @@ class Controller(MyCanvas):
         )
         self.canvas.draw()
 
+    def __getComps(self, product):
+        with self.engine.begin() as con:
+            data = pd.read_sql(f"{product}_placementData", con)
+        data = data["Code"].unique()
+        return data.tolist()
+
     def __calcGroups(self, solutionList):
         """Method to calculate batch queues.
 
@@ -236,9 +243,9 @@ class Controller(MyCanvas):
         solutionListReturn = []
         for i in range(len(solutionList)):
             product = solutionList[i]
-            Components = self.products[product]["comps"]
+            Components = self.__getComps(product)
             try:
-                ComponentsNext = self.products[solutionList[i + 1]]["comps"]
+                ComponentsNext = self.__getComps(solutionList[i + 1])
             except:
                 ComponentsNext = []
             overlapComponents = list(set(Components) & set(ComponentsNext))
