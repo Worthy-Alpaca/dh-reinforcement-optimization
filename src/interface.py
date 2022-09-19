@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 import os
 import json
@@ -17,6 +18,7 @@ from os.path import exists
 from logging import info, warning
 
 from misc.dataloader import KappaLoader
+from modules.extra.dataextender import DataExtender
 
 
 PACKAGE_PARENT = "../"
@@ -245,7 +247,7 @@ class Interface:
     def __onClose(self, *args: any, **kwargs: any) -> None:
         """Closing Operation. Saves config variables to file."""
         if self.__askQuestion(
-            "Beenden",
+            "",
             "Möchten Sie wirklich beenden?",
         ):
             path = self.basePath
@@ -314,13 +316,22 @@ class Interface:
             pathDir = self.basePath + os.path.normpath("/models")
         else:
             pathDir = self.resource_path("/bin/assets/models")
-        best_value, best_solution = runmodel.getBestOder(
-            sampleReqs=sampleReqs,
-            samples=samples,
-            plot=True,
-            numCarts=self.config.getint("default", "numCarts"),
-            modelFolder=pathDir,
-        )
+        best_time = -float("inf")
+        best_value = any
+        best_solution = any
+        for x in range(10):
+            running_value, running_solution = runmodel.getBestOder(
+                sampleReqs=sampleReqs,
+                samples=samples,
+                plot=True,
+                numCarts=self.config.getint("default", "numCarts"),
+                modelFolder=pathDir,
+            )
+            running_time = runmodel.helper.calc_total_time(running_solution["solution"])
+            if running_time[0] > best_time:
+                best_time = running_time[0]
+                best_value = running_value
+                best_solution = running_solution
         self.controller(
             best_value,
             best_solution,
@@ -485,7 +496,56 @@ class Interface:
                 self.config.get("optimizer_backend", "dbpath")
             ),
         )
+        filemenu.add_command(label="Neues Produkt einfügen", command=self.__addNewData)
+        filemenu.add_separator()
         filemenu.add_command(label="Optionen", command=self.__setOptions)
+
+    def __addNewData(self):
+        datapath = self.__openNew(
+            startPath=self.basePath,
+            filetypes=[
+                (
+                    "Excel Datei",
+                    ".xlsm .xls",
+                ),
+                ("Alle Dateien", "."),
+            ],
+        )
+
+        dataextender = DataExtender(self.config.get("optimizer_backend", "dbpath"))
+        success, productName = dataextender.checkDir(Path(datapath))
+        if success:
+            info("Product added successfully to database")
+            return self.controller.wait("Produkt erfolgreich in Datenbank aufgenommen.")
+        elif success == None:
+            top = self.__createToplevel(height=250, width=350)
+            bigframe = ttk.Frame(top)
+            bigframe.pack(side="top", fill="both", expand=1)
+            ttk.Label(
+                bigframe,
+                text=f"Bitte geben Sie die Anzahl der Abschaltungen\n pro Nutzen für das Produkt {productName} ein.",
+            ).pack(side="top", pady=5)
+            offsetEntryVar = tk.IntVar()
+            errorFrame = ttk.Frame(bigframe)
+            errorFrame.pack()
+            ttk.Entry(bigframe, textvariable=offsetEntryVar).pack(pady=5)
+
+            def getData():
+                numOffsets = offsetEntryVar.get()
+                if numOffsets == 0:
+                    ttk.Label(
+                        errorFrame,
+                        text="Bitte geben Sie eine Zahl größer als 0 ein.",
+                        foreground="red",
+                    ).pack()
+                    return
+                with dataextender.engine.begin() as con:
+                    con.execute(
+                        f"INSERT INTO 'products' (product, numOffsets) VALUES ('{productName}', {int(numOffsets)} )"
+                    )
+                    info("Product added successfully to database")
+
+            ttk.Button(bigframe, text="OK", command=getData).pack(pady=5)
 
     def __createButton(
         self,
