@@ -134,7 +134,8 @@ class Interface:
                 ),
                 logging.StreamHandler(stream=sys.stdout),
             ],
-            format="%(asctime)s :: %(levelname)s :: %(message)s",
+            format="%(asctime)s || %(levelname)s || %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
 
         self.__createForms()
@@ -234,12 +235,16 @@ class Interface:
         self.config.set("default", "useCache", "true")
         self.config.set("default", "numCarts", "3")
         self.config.set("default", "progressBar", "True")
-        self.config.set("default", "trainingSamples", "13")
         self.config.set("default", "darkmode", "true")
         self.config.set("default", "solutionIterator", "10")
         self.config.add_section("optimizer_backend")
         self.config.set("optimizer_backend", "dbpath", "")
         self.config.set("optimizer_backend", "overlapThreshhold", "0.5")
+        self.config.add_section("model_training")
+        self.config.set("model_training", "trainingSamples", "13")
+        self.config.set("model_training", "trainingEpisodes", "500")
+        self.config.set("model_training", "batch_size", "16")
+        self.config.set("model_training", "gamma", "0.7")
 
     def __call__(self, *args: any, **kwds: any) -> None:
         """Call this to initate the window."""
@@ -305,7 +310,7 @@ class Interface:
 
         runmodel = RunModel(
             dbpath=self.config.get("optimizer_backend", "dbpath"),
-            numSamples=self.config.getint("default", "trainingSamples"),
+            numSamples=self.config.getint("model_training", "trainingSamples"),
             caching=self.config.getboolean("default", "useCache"),
             disableProgress=self.config.getboolean("default", "progressBar"),
             overwriteDevice="cpu",
@@ -360,7 +365,7 @@ class Interface:
             info("Starting training iteration.")
             runmodel = RunModel(
                 dbpath=self.config.get("optimizer_backend", "dbpath"),
-                numSamples=self.config.getint("default", "trainingSamples"),
+                numSamples=self.config.getint("model_training", "trainingSamples"),
                 caching=self.config.getboolean("default", "useCache"),
             )
             EMBEDDING_DIMENSIONS = 10
@@ -375,12 +380,12 @@ class Interface:
                 Q_net=QNet,
                 optimizer=Adam,
                 lr_scheduler=ExponentialLR,
-                NR_EPISODES=501,
+                NR_EPISODES=self.config.getint("model_training", "trainingEpisodes"),
                 MIN_EPSILON=0.7,
                 EPSILON_DECAY_RATE=6e-4,
                 N_STEP_QL=4,
-                BATCH_SIZE=16,
-                GAMMA=0.7,
+                BATCH_SIZE=self.config.getint("model_training", "batch_size"),
+                GAMMA=self.config.getfloat("model_training", "gamma"),
             )
         else:
             return
@@ -549,6 +554,8 @@ class Interface:
                         f"INSERT INTO 'products' (product, numOffsets) VALUES ('{productName}', {int(numOffsets)} )"
                     )
                     info("Product added successfully to database")
+                top.grab_release()
+                top.withdraw()
 
             ttk.Button(bigframe, text="OK", command=getData).pack(pady=5)
 
@@ -673,6 +680,58 @@ class Interface:
         cal.pack(fill="both", expand=True)
         ttk.Button(top, text="OK", command=lambda: getDate(cal)).pack()
 
+    def __showTrainingOptions(self):
+        toplevel = self.__createToplevel(height=500, title="Erweitert")
+        top = ttk.Frame(toplevel)
+        top.pack(side="top", expand=1, fill="both")
+
+        def callback():
+            self.config.set(
+                "model_training", "trainingSamples", str(trainingSamples.get())
+            )
+            self.config.set(
+                "model_training", "trainingEpisodes", str(trainingEpisodes.get())
+            )
+            self.config.set("model_training", "batch_size", str(batch_size.get()))
+            gammaFixed = gamma.get().replace(",", ".")
+            self.config.set("model_training", "gamma", str(gammaFixed))
+
+            info(f"Successfully set trainingSamples to {str(trainingSamples.get())}")
+            info(f"Successfully set trainingEpisodes to {str(trainingEpisodes.get())}")
+            info(f"Successfully set batch_size to {str(batch_size.get())}")
+            info(f"Successfully set gamma to {str(gammaFixed)}")
+
+            toplevel.grab_release()
+            toplevel.withdraw()
+
+        ttk.Label(top, text="Anzahl an Samples für Training").pack(pady=5)
+        ttk.Label(top, text="Muss eine Ganzzahl sein.", font=("", 10, "italic")).pack()
+        trainingSamples = tk.IntVar()
+        trainingSamples.set(self.config.getint("model_training", "trainingSamples"))
+        ttk.Entry(top, textvariable=trainingSamples).pack(pady=5)
+
+        ttk.Label(top, text="Anzahl an Training Episoden").pack(pady=5)
+        ttk.Label(top, text="Muss eine Ganzzahl sein.", font=("", 10, "italic")).pack()
+        trainingEpisodes = tk.IntVar()
+        trainingEpisodes.set(self.config.getint("model_training", "trainingEpisodes"))
+        ttk.Entry(top, textvariable=trainingEpisodes).pack(pady=5)
+
+        ttk.Label(top, text="Batch größe").pack(pady=5)
+        ttk.Label(top, text="Muss eine Ganzzahl sein.", font=("", 10, "italic")).pack()
+        batch_size = tk.IntVar()
+        batch_size.set(self.config.getint("model_training", "batch_size"))
+        ttk.Entry(top, textvariable=batch_size).pack(pady=5)
+
+        ttk.Label(top, text="Größe für gamma").pack(pady=5)
+        ttk.Label(
+            top, text="Muss eine Dezimalzahl unter 1 sein.", font=("", 10, "italic")
+        ).pack()
+        gamma = tk.StringVar()
+        gamma.set(self.config.getfloat("model_training", "gamma"))
+        ttk.Entry(top, textvariable=gamma).pack(pady=5)
+
+        ttk.Button(top, text="OK", command=callback).pack(pady=5)
+
     def __setOptions(self) -> tk.Toplevel:
         """Creates window for option management.
 
@@ -680,20 +739,21 @@ class Interface:
             tk.Toplevel: The created window.
         """
         toplevel = self.__createToplevel(height=500, title="Optionen")
+        menubar = Menubar(toplevel)
+        menu = MenuCustom(menubar, "Erweitert")
+        menu.add_command("Trainingsoptionen", command=self.__showTrainingOptions)
+
         top = ttk.Frame(toplevel)
         top.pack(side="top", expand=1, fill="both")
 
         def callback():
             numCart = numCarts.get()
-            trainingSamp = trainingSamples.get()
             address = overlapThreshhold.get()
             solutionIt = solutionIterator.get()
             address = address.replace(",", ".")
             self.config.set("default", "numCarts", str(numCart))
-            self.config.set("default", "trainingSamples", str(trainingSamp))
             self.config.set("default", "solutionIterator", str(solutionIt))
             self.config.set("optimizer_backend", "overlapThreshhold", str(address))
-            info(f"Successfully set trainingSamples to {str(trainingSamp)} ")
             info(f"Successfully set numCarts to {str(numCart)} ")
             info(f"Successfully set overlapThreshhold to {str(float(address) * 100)}% ")
             info(f"Successfully set solutionIterator to {str(solutionIt)} ")
@@ -701,11 +761,6 @@ class Interface:
             toplevel.grab_release()
             return True
 
-        ttk.Label(top, text="Anzahl an Samples für Training").pack(pady=5)
-        ttk.Label(top, text="Muss eine Ganzzahl sein.", font=("", 10, "italic")).pack()
-        trainingSamples = tk.IntVar()
-        trainingSamples.set(self.config.getint("default", "trainingSamples"))
-        ttk.Entry(top, textvariable=trainingSamples).pack(pady=5)
         ttk.Label(top, text="Verfügbare Anzahl an Rüstwagen").pack(pady=5)
         ttk.Label(top, text="Muss eine Ganzzahl sein.", font=("", 10, "italic")).pack()
         numCarts = tk.IntVar()
