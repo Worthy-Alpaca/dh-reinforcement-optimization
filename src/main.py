@@ -747,12 +747,24 @@ class RunModel:
             self.path_lengths.append(length)
             self.writer.add_scalar("Pathlength", length, episode)
             self.__createTensorboardLogs(Q_net, episode)
-            if trial is not None:
-                trial.report(length, episode)
-                if trial.should_prune():
-                    self.writer.close()
-                    raise optuna.exceptions.TrialPruned()
-        return current_min_med_length
+            if len(self.losses) < 1:
+                trial.report(-1.0, episode)
+            else:
+                trial.report(
+                    np.median(
+                        np.convolve(
+                            np.array(self.losses), np.ones((100,)) / 100, mode="valid"
+                        )
+                    ),
+                    episode,
+                )
+            if trial.should_prune():
+                self.writer.close()
+                raise optuna.exceptions.TrialPruned()
+
+        return np.median(
+            np.convolve(np.array(self.losses), np.ones((100,)) / 100, mode="valid")
+        )
 
     def __createTensorboardLogs(self, model: nn.Module, epoch):
         for name, module in model.named_children():
