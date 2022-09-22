@@ -200,7 +200,7 @@ class RunModel:
         coords, W_np, _ = self.getData()
 
         W = torch.tensor(
-            W_np, dtype=torch.float32, requires_grad=False, device=self.device
+            W_np, dtype=torch.float, requires_grad=False, device=self.device
         )
         solution = [random.randint(0, coords.shape[0] - 1)]
         current_state = self.State(
@@ -372,7 +372,7 @@ class RunModel:
         ]
 
         return torch.tensor(
-            xv, dtype=torch.float32, requires_grad=False, device=self.device
+            xv, dtype=torch.float, requires_grad=False, device=self.device
         )
 
     def getRandomSample(self, size: int, notAllowed: list = False):
@@ -568,6 +568,7 @@ class RunModel:
         BATCH_SIZE: int,
         GAMMA: float,
         trial: optuna.trial.Trial = None,
+        debug: bool = False,
     ):
         """Train the current model.
 
@@ -609,7 +610,7 @@ class RunModel:
                 torch.tensor(
                     W_np,
                     device=self.device,
-                    dtype=torch.float32,
+                    dtype=torch.float,
                     requires_grad=False,
                 ),
                 components.to(self.device, non_blocking=True),
@@ -744,23 +745,39 @@ class RunModel:
                         )
 
             length, solution = self.helper.total_distance(solution, W)
+            if debug:
+                if episode % 10 == 0:
+                    print(
+                        "Ep %d. Loss = %.3f / median length = %.3f / last = %.4f / epsilon = %.4f / lr = %.4f"
+                        % (
+                            episode,
+                            (-1 if loss is None else loss),
+                            np.median(self.path_lengths[-50:]),
+                            length,
+                            epsilon,
+                            Q_func.optimizer.param_groups[0]["lr"],
+                        )
+                    )
             self.path_lengths.append(length)
             self.writer.add_scalar("Pathlength", length, episode)
             self.__createTensorboardLogs(Q_net, episode)
-            if len(self.losses) < 1:
-                trial.report(-1.0, episode)
-            else:
-                trial.report(
-                    np.median(
-                        np.convolve(
-                            np.array(self.losses), np.ones((100,)) / 100, mode="valid"
-                        )
-                    ),
-                    episode,
-                )
-            if trial.should_prune():
-                self.writer.close()
-                raise optuna.exceptions.TrialPruned()
+            if trial is not None:
+                if len(self.losses) < 1:
+                    trial.report(-1.0, episode)
+                else:
+                    trial.report(
+                        np.median(
+                            np.convolve(
+                                np.array(self.losses),
+                                np.ones((100,)) / 100,
+                                mode="valid",
+                            )
+                        ),
+                        episode,
+                    )
+                if trial.should_prune():
+                    self.writer.close()
+                    raise optuna.exceptions.TrialPruned()
 
         return np.median(
             np.convolve(np.array(self.losses), np.ones((100,)) / 100, mode="valid")
@@ -857,7 +874,7 @@ class RunModel:
         components = torch.from_numpy(components)
         self.helper = UtilFunctions(components)
         W = torch.tensor(
-            W_np, dtype=torch.float32, requires_grad=False, device=self.device
+            W_np, dtype=torch.float, requires_grad=False, device=self.device
         )
 
         solution = [random.randint(0, coords.shape[0] - 1)]
@@ -925,12 +942,13 @@ if __name__ == "__main__":
     START_TIME = time.perf_counter()
     EMBEDDING_DIMENSIONS = 16
     EMBEDDING_ITERATIONS_T = 2
-    # runmodel = RunModel(
-    #     dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
-    #     numSamples=16,
-    #     tuning=False,
-    #     allowDuplicates=False,
-    # )
+    runmodel = RunModel(
+        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
+        numSamples=24,
+        tuning=False,
+        allowDuplicates=False,
+    )
+    # runmodel.generateData()
 
     # all_lengths_fnames = [
     #     f for f in os.listdir(runmodel.folder_name) if f.endswith(".tar")
@@ -942,24 +960,24 @@ if __name__ == "__main__":
     # emb = int(fname[fname.index("emb") + 1])
     # it = int(fname[fname.index("it") + 1])
 
-    # Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
-    #     # fname=os.path.join(runmodel.folder_name, shortest_fname),
-    #     EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
-    #     EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
-    #     OPTIMIZER=torch.optim.Adam,
-    # )
-    # runmodel.fit(
-    #     Q_func=Q_Function,
-    #     Q_net=QNet,
-    #     optimizer=Adam,
-    #     lr_scheduler=ExponentialLR,
-    #     NR_EPISODES=1000,  # die sind noch über, bestes modell laden
-    #     MIN_EPSILON=0.7,
-    #     EPSILON_DECAY_RATE=6e-4,
-    #     N_STEP_QL=4,
-    #     BATCH_SIZE=16,
-    #     GAMMA=0.7,
-    # )
+    Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
+        # fname=os.path.join(runmodel.folder_name, shortest_fname),
+        EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
+        EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
+        OPTIMIZER=torch.optim.Adam,
+    )
+    runmodel.fit(
+        Q_func=Q_Function,
+        Q_net=QNet,
+        optimizer=Adam,
+        lr_scheduler=ExponentialLR,
+        NR_EPISODES=1000,  # die sind noch über, bestes modell laden
+        MIN_EPSILON=0.7,
+        EPSILON_DECAY_RATE=6e-4,
+        N_STEP_QL=4,
+        BATCH_SIZE=16,
+        GAMMA=0.7,
+    )
 
     END_TIME = time.perf_counter() - START_TIME
 
