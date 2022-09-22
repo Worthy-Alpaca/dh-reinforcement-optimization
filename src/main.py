@@ -38,6 +38,12 @@ from misc.dataloader import DataLoader, DataBaseLoader, KappaLoader
 from misc.dataset import ProductDataloader, ProductDataset
 
 
+#######################
+# Credit goes to unit8co for the base code.
+# Modifications where made under the included GNU GENERAL PUBLIC LICENSE
+#######################
+
+
 class RunModel:
     def __init__(
         self,
@@ -588,6 +594,7 @@ class RunModel:
         self.losses = []
         self.lrs = []
         self.path_lengths = []
+        self.rewards = []
         current_min_med_length = float("inf")
         Q_net = Q_net.float()
         BATCH_SIZE = self.numSamples
@@ -658,7 +665,7 @@ class RunModel:
                     self.helper.total_distance(next_solution, W)[0]
                     - self.helper.total_distance(solution, W)[0]
                 )
-
+                self.rewards.append(reward)
                 next_state = self.State(
                     partial_solution=next_solution,
                     W=W,
@@ -732,7 +739,7 @@ class RunModel:
                     self.writer.add_scalar(
                         "LearningRate", Q_func.optimizer.param_groups[0]["lr"], t
                     )
-                    med_length = np.median(self.path_lengths[-100:])
+                    med_length = np.median(self.losses[-100:])
                     if med_length < current_min_med_length:
                         current_min_med_length = med_length
                         self.checkpoint_model(
@@ -806,8 +813,8 @@ class RunModel:
         plt.xlabel("training iteration")
 
         plt.figure(figsize=(8, 5))
-        plt.semilogy(_moving_avg(self.lrs, 100))
-        plt.ylabel("learning rate")
+        plt.semilogy(self.rewards)
+        plt.ylabel("Rewards")
         plt.xlabel("training iteration")
 
         plt.figure(figsize=(8, 5))
