@@ -665,7 +665,7 @@ class RunModel:
                     self.helper.total_distance(next_solution, W)[0]
                     - self.helper.total_distance(solution, W)[0]
                 )
-                self.rewards.append(reward)
+                self.rewards.append(self.helper.total_distance(next_solution, W)[0])
                 next_state = self.State(
                     partial_solution=next_solution,
                     W=W,
@@ -812,10 +812,10 @@ class RunModel:
         plt.ylabel("loss")
         plt.xlabel("training iteration")
 
-        plt.figure(figsize=(8, 5))
-        plt.semilogy(self.rewards)
-        plt.ylabel("Rewards")
-        plt.xlabel("training iteration")
+        # plt.figure(figsize=(8, 5))
+        # plt.scatter(range(len(self.rewards)), self.rewards, "-o")
+        # plt.ylabel("Rewards")
+        # plt.xlabel("training iteration")
 
         plt.figure(figsize=(8, 5))
         plt.plot(_moving_avg(self.path_lengths, 100))
@@ -978,13 +978,14 @@ if __name__ == "__main__":
         Q_net=QNet,
         optimizer=Adam,
         lr_scheduler=ExponentialLR,
-        NR_EPISODES=1000,  # die sind noch über, bestes modell laden
+        NR_EPISODES=500,  # die sind noch über, bestes modell laden
         MIN_EPSILON=0.7,
         EPSILON_DECAY_RATE=6e-4,
         N_STEP_QL=4,
         BATCH_SIZE=16,
         GAMMA=0.7,
     )
+    runmodel.plotMetrics()
 
     END_TIME = time.perf_counter() - START_TIME
 
