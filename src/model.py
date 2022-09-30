@@ -6,16 +6,16 @@ from scipy.spatial import distance_matrix
 
 
 class QNetModel(nn.Module):
-    def __init__(self, emb_dim, T=4, device=torch.device("cpu")) -> None:
+    def __init__(self, emb_dim, emb_it=4, device=torch.device("cpu")) -> None:
         super(QNetModel, self).__init__()
         self.emb_dim = emb_dim
-        self.T = T
+        self.emb_it = 1
 
         self.node_dim = 6
 
         self.device = device
 
-        nr_extra_layers_1 = T
+        nr_extra_layers_1 = emb_it
 
         self.theta1 = nn.Linear(self.node_dim, self.emb_dim, True, device=self.device)
         self.theta2 = nn.Linear(self.emb_dim, self.emb_dim, True, device=self.device)
@@ -41,6 +41,7 @@ class QNetModel(nn.Module):
 
         mu = torch.zeros(batch_size, num_nodes, self.emb_dim, device=self.device)
         s1 = self.theta1(xv)
+
         for layer in self.theta1_extras:
             s1 = layer(F.relu(s1))
 
@@ -48,18 +49,18 @@ class QNetModel(nn.Module):
         s3_2 = torch.sum(s3_1, dim=1)
         s3 = self.theta3(s3_2)
 
-        for t in range(self.T):
+        for t in range(self.emb_it):
             s2 = self.theta2(conn_matrices.matmul(mu))
-            mu2 = F.relu(s1 + s2 + s3)
+            if torch.any(torch.isnan(s2)):
+                s2 = torch.nan_to_num(s2)
+            mu = F.relu(s1 + s2 + s3)
 
         global_state = self.theta6(
-            torch.sum(mu2, dim=1, keepdim=True).repeat(1, num_nodes, 1)
+            torch.sum(mu, dim=1, keepdim=True).repeat(1, num_nodes, 1)
         )
 
-        local_action = self.theta7(mu2)
+        local_action = self.theta7(mu)
 
         out = F.relu(torch.cat([global_state, local_action], dim=2))
         out2 = self.theta5(out).squeeze(dim=2)
-        if torch.any(torch.isnan(out)):
-            print()
         return out2
