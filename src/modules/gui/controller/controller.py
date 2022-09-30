@@ -2,15 +2,17 @@ import random
 import tkinter as tk
 import pandas as pd
 import numpy as np
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, engine
 from logging import info
 from helper import UtilFunctions
 from matplotlib.pyplot import style
 
 try:
     from src.modules.gui.parent.canvas import MyCanvas
+    from src.misc.dataloader import DataBaseLoader
 except:
     from modules.gui.parent.canvas import MyCanvas
+    from misc.dataloader import DataBaseLoader
 
 
 class Controller(MyCanvas):
@@ -25,6 +27,7 @@ class Controller(MyCanvas):
         best_value,
         best_solution,
         dbpath: str,
+        refEngine: engine,
         calcGroups: bool = False,
         overlapThreshhold: float = 0.5,
     ) -> None:
@@ -46,12 +49,13 @@ class Controller(MyCanvas):
         self.components = best_solution["components"]
         self.numCarts = best_solution["numCarts"]
         self.products = best_solution["products"]
+        self.dbpath = dbpath
+        self.refEngine = refEngine
         if calcGroups:
             self.validate = False
         else:
             self.validate = True
         self.helper = UtilFunctions(self.components)
-        self.engine = create_engine(f"sqlite:///{dbpath}")
 
         info(
             f"The best value for this iteration is: {self.best_value}",
@@ -222,12 +226,6 @@ class Controller(MyCanvas):
         )
         self.canvas.draw()
 
-    def __getComps(self, product):
-        with self.engine.begin() as con:
-            data = pd.read_sql(f"{product}_placementData", con)
-        data = data["Code"].unique()
-        return data.tolist()
-
     def __calcGroups(self, solutionList):
         """Method to calculate batch queues.
 
@@ -241,11 +239,12 @@ class Controller(MyCanvas):
         runningSlots = 0
         solutionListRunning = []
         solutionListReturn = []
+        dataloader = DataBaseLoader(self.dbpath)
         for i in range(len(solutionList)):
             product = solutionList[i]
-            Components = self.__getComps(product)
+            Components = dataloader.getProductData(product)
             try:
-                ComponentsNext = self.__getComps(solutionList[i + 1])
+                ComponentsNext = dataloader.getProductData(solutionList[i + 1])
             except:
                 ComponentsNext = []
             overlapComponents = list(set(Components) & set(ComponentsNext))
@@ -284,7 +283,7 @@ class Controller(MyCanvas):
         """
         numComponents = 0
         for i in components:
-            with self.engine.begin() as connection:
+            with self.refEngine.begin() as connection:
                 result = connection.execute(
                     f"SELECT * FROM 'ReferenceComponents' WHERE Component = '{i}'"
                 ).first()
