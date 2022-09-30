@@ -12,6 +12,7 @@ import ctypes as ct
 import tkinter as tk
 from tkinter import *
 from types import FunctionType
+from sqlalchemy import create_engine
 from tkinter import Grid, filedialog, PhotoImage, ttk
 from tkcalendar import Calendar
 from os.path import exists
@@ -80,6 +81,15 @@ class Interface:
             self.photo = PhotoImage(
                 file=os.getcwd() + os.path.normpath("/src/assets/logo.gif")
             )
+        if exists(self.resource_path("bin/assets/referenceData.db")):
+            path = self.resource_path("bin/assets/referenceData.db")
+            self.refEngine = create_engine(f"sqlite:///{path}", echo=False)
+        else:
+            path = os.path.normpath(
+                os.getcwd() + os.path.normpath("/src/assets/referenceData.db")
+            )
+            self.refEngine = create_engine(f"sqlite:///{path}")
+
         self.masterframe.iconphoto(True, self.photo)
         self.masterframe.title("SMD Produktions Optimierung")
         Titlebar(
@@ -96,8 +106,6 @@ class Interface:
         )
 
         self.calDate = {}
-        self.machines = {}
-        self.OptionList = []
 
         self.optimizerData = None
 
@@ -200,7 +208,9 @@ class Interface:
     def __findDBPath(self, basepath=False):
         top = self.__createToplevel(150, 300, title="Optionen")
 
-        label = ttk.Label(master=top, text="Bitte navigieren Sie zur Datenbank Datei.")
+        label = ttk.Label(
+            master=top, text="Bitte navigieren Sie zur benötigten .txt Datei."
+        )
         label.pack()
 
         basepath = basepath if basepath != False else self.basePath
@@ -209,7 +219,7 @@ class Interface:
             top.withdraw()
             top.grab_release()
             datapath = self.__openNew(
-                startPath=basepath, filetypes=[("Database File", ".db")]
+                startPath=basepath, filetypes=[("Text File", ".txt")]
             )
             if datapath == None:
                 return self.__findDBPath()
@@ -314,6 +324,7 @@ class Interface:
             caching=self.config.getboolean("default", "useCache"),
             disableProgress=self.config.getboolean("default", "progressBar"),
             overwriteDevice="cpu",
+            refEngine=self.refEngine,
         )
         loader = KappaLoader(
             os.path.normpath(datapath),
@@ -348,6 +359,7 @@ class Interface:
             dbpath=self.config.get("optimizer_backend", "dbpath"),
             calcGroups=self.config.getboolean("default", "calcgroups"),
             overlapThreshhold=0.5,
+            refEngine=self.refEngine,
         )
         return
 
