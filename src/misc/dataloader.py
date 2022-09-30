@@ -15,14 +15,14 @@ class DataBaseLoader:
         file = open(pathToProductTxT, "r")
         self.refEngine = refEngine
 
-        def createCleanData(x: str):
-            pattern = re.compile("[0-9]{7}-[0-9]")
+        def createCleanData(x: str, header: bool = False):
+            pattern = re.compile("[0-9]{7}-[0-9]{1,}")
             x = x.replace(" ", "")
             if len(x) < 7:
                 return np.nan
             if not header:
                 if not bool(re.match(pattern, x)):
-                    return np.nan, np.nan
+                    return np.nan, 0
             cleanString = f"{x[:2]}.{x[2:5]}.{x[5:7]}"
             amount = x[8:] if x[8:] else 0
             amount = amount if amount == 0 or len(amount) == 1 else amount[-1]
@@ -51,7 +51,7 @@ class DataBaseLoader:
         values = values[~pd.isnull(values)]
         values.sort()
 
-        def count_and_append(a):  # For sorted arrays
+        def count_and_append(a):
             a0 = a[:]
             sf0 = np.flatnonzero(a0[1:] != a0[:-1]) + 1
             shift_idx = np.concatenate(([0], sf0, [a0.size]))
