@@ -1,223 +1,100 @@
+from email import header
 from logging import warning
 import os
+from random import random
 import sqlalchemy
 import pandas as pd
 from pathlib import Path
-from sqlalchemy import create_engine
-
-
-class DataLoader:
-    """
-    Returns a tuple that contains all needed DataFrames
-
-    `returns:` (`data`, `components`, `offsets`)
-    """
-
-    def __init__(self, data_folder: Path, separator: str = ","):
-        """Initializes a new DataLoader instance.
-
-        Args:
-            data_folder (Path): Path to the current SMD Program. May change to a DB connection.
-            separator (str, optional): The seperator to be used. Defaults to ",".
-        """
-        matchers = ["Cmp", "Kyu", "Tou"]
-        matching = [
-            s for s in os.listdir(data_folder) if any(xs in s for xs in matchers)
-        ]
-        global_string = Path(
-            os.getcwd() + os.path.normpath("/global/Components width.csv")
-        )
-        self.global_Feeder_Data = pd.read_csv(global_string, sep=";")
-
-        for i in matching:
-            skip = -1
-            while True:
-                skip = skip + 1
-
-                df = pd.read_csv(
-                    str(data_folder) + "/" + i,
-                    sep=separator,
-                    skiprows=skip,
-                    encoding="unicode_escape",
-                )
-                if "Component Code" in df.columns:
-                    break
-
-            if "Cmp" in i:
-                self.product_components_data = df
-            elif "Kyu" in i:
-                self.product_feeder_data = df
-            elif "Tou" in i:
-                self.product_data = df
-
-    def __call__(
-        self, *args: any, **kwds: any
-    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """Generate the needed Data for an assembly simulation.
-
-        Returns:
-            tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: Returns data, components, offsetlist
-        """
-        neededColumns_Data = ["Component Code", "X", "Y", "Task"]
-        neededColumns_Components = [
-            "Component Code",
-            "Placement(Acceleration):X",
-            "Placement(Acceleration):Y",
-            "Placement(Acceleration):Z",
-            "Priority Nozzle No.",
-        ]
-        neededColumns_Feeder = ["Component Code", "FeedStyle", "ST No."]
-        data = self.product_data[neededColumns_Data]
-        components_data = self.product_components_data[neededColumns_Components]
-        components_feeder_data = self.product_feeder_data[neededColumns_Feeder]
-        data = pd.merge(
-            left=data,
-            left_on="Component Code",
-            right=components_data,
-            right_on="Component Code",
-            how="left",
-        )
-        components_data = pd.merge(
-            left=components_data,
-            left_on="Component Code",
-            right=components_feeder_data,
-            right_on="Component Code",
-            how="left",
-        )
-
-        data = data.rename(columns={"Component Code": "Code"})
-        components_data = components_data.rename(
-            columns={
-                "Component Code": "index",
-                "Priority Nozzle No.": "Nozzle_No",
-                "ST No.": "ST_No",
-                "Placement(Acceleration):Z": "Dropoff",
-            }
-        )
-        components_feeder_data = components_feeder_data.rename(
-            columns={"Component Code": "index"}
-        )
-
-        # replace commas with decimal points
-        data["X"] = data["X"].replace({",": "."}, regex=True).astype(float)
-        data["Y"] = data["Y"].replace({",": "."}, regex=True).astype(float)
-
-        components_data["FeedStyle"] = components_data["FeedStyle"].replace(
-            {"^ST-F$": "ST-FL", "^ST-R$": "ST-RL"}, regex=True
-        )
-
-        # calculate the mean of X and Y acceleration
-        components_data["mean_acceleration"] = components_data[
-            ["Placement(Acceleration):X", "Placement(Acceleration):Y"]
-        ].mean(axis=1)
-        components_data["mean_acceleration"] = components_data["mean_acceleration"]
-        # devide coordinates
-        if data["X"].max() > 1000:
-            data["X"] = data["X"] / 1000
-            data["Y"] = data["Y"] / 1000
-
-        # split offset and drop duplicates
-        offsets = data.loc[data["Task"] == "Repeat Offset"]
-        zero_offset = pd.DataFrame(
-            {"Code": "", "X": 0, "Y": 0, "Task": "Repeat Offset"}, index=[0]
-        )
-        offsets = pd.concat([zero_offset, offsets], axis=0)
-        offsets = offsets.drop_duplicates()
-        offsets = offsets.reindex()
-        offsetlist = []
-        for index, row in offsets.iterrows():
-            offset = (row.X, row.Y)
-            offsetlist.append(offset)
-
-        data = data.loc[data["Task"] != "B Mark Positive Logic"]
-        fid = data[(data.Task == "Fiducial")]
-        fid = fid.rename(columns={"Code": "index"})
-
-        # create component dataset
-        occ = data["Code"].value_counts()
-        components = pd.DataFrame(occ, columns=["Code"]).reset_index()
-        # create pickup coordinates
-        components["Pickup_Y"] = 0
-        components["Pickup_X"] = range(len(components.index))
-        components = pd.merge(
-            left=components,
-            right=components_data,
-            left_on="index",
-            right_on="index",
-            how="left",
-        ).drop_duplicates()
-        components = pd.merge(
-            left=components,
-            right=self.global_Feeder_Data,
-            left_on="index",
-            right_on="Component Code",
-            how="left",
-        ).drop_duplicates()
-        components = components.drop(["Component Code"], axis=1)
-        components["mean_acceleration"] = components["mean_acceleration"].fillna(1000.0)
-
-        data = data.dropna()
-
-        data.columns = data.columns.str.replace(" ", "_")
-        components.columns = components.columns.str.replace(" ", "_")
-        self.data = data
-        self.components = components
-        self.offsets = offsetlist
-        return (data, components, offsetlist)
+from sqlalchemy import engine
+import re
+import numpy as np
 
 
 class DataBaseLoader:
-    def __init__(
-        self,
-        dataBase: sqlalchemy.engine.base.Engine,
-        product: str,
-        allProducts: list,
-    ) -> None:
-        """Load the required Data from the ``products.db`` database.
+    def __init__(self, pathToProductTxT: Path, refEngine: engine = None) -> None:
+        file = open(pathToProductTxT, "r")
+        self.refEngine = refEngine
 
-        Args:
-            dataBase (sqlalchemy.engine.base.Engine): The current database connection.
-            product (str): The current product name.
-            allProducts (list): List of all available products.
-        """
-        with dataBase.begin() as connection:
-            tableName = f"{product}_placementData"
-            self.data = pd.read_sql_table(tableName, connection)
-            self.data["X"] = (
-                self.data["X"]
-                .replace({"\D+": ""}, regex=True)
-                .replace({",": "."}, regex=True)
-                .astype(float)
-            )
-            self.data["Y"] = (
-                self.data["Y"]
-                .replace({"\D+": ""}, regex=True)
-                .replace({",": "."}, regex=True)
-                .astype(float)
-            )
-            self.components = self.data["Code"].unique()
+        def createCleanData(x: str):
+            pattern = re.compile("[0-9]{7}-[0-9]")
+            x = x.replace(" ", "")
+            if len(x) < 7:
+                return np.nan
+            if not header:
+                if not bool(re.match(pattern, x)):
+                    return np.nan, np.nan
+            cleanString = f"{x[:2]}.{x[2:5]}.{x[5:7]}"
+            amount = x[8:] if x[8:] else 0
+            amount = amount if amount == 0 or len(amount) == 1 else amount[-1]
+            return cleanString, amount
 
-            try:
-                numOffsets = connection.execute(
-                    f"SELECT * FROM 'products' WHERE product = '{product}' "
-                ).fetchall()[0][1]
-            except:
-                numOffsets = 1
+        prodDB = {}
+        refDB = {}
+        for line in file:
+            lineContent = line.strip().split(";")
+            productName = lineContent.pop(0).replace(" ", "")
+            productName, _ = createCleanData(productName, header=True)
+            components = []
+            runningAmount = 0
+            for x in lineContent:
+                cleanString, amount = createCleanData(x)
+                components.append(cleanString)
+                runningAmount += int(amount)
 
-            self.offsets = numOffsets
+            prodDB[productName] = components
+            refDB[productName] = runningAmount
+        file.close()
 
-            score = 0
-            allProducts = len(allProducts)
-            for x in self.components:
-                tempScore = connection.execute(
-                    f"SELECT * FROM 'allcomponents' WHERE component = '{x}'"
-                ).fetchall()[0][1]
-                score += tempScore / allProducts
+        df = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in prodDB.items()]))
 
-            self.score = score
+        values = df.values.ravel("K")
+        values = values[~pd.isnull(values)]
+        values.sort()
 
-    def __call__(self):
-        return (self.data, self.components, self.offsets, self.score)
+        def count_and_append(a):  # For sorted arrays
+            a0 = a[:]
+            sf0 = np.flatnonzero(a0[1:] != a0[:-1]) + 1
+            shift_idx = np.concatenate(([0], sf0, [a0.size]))
+            c = shift_idx[1:] - shift_idx[:-1]
+            out_col = np.repeat(c, c)
+            return np.column_stack((a, out_col))
+
+        values = count_and_append(values)
+        values = pd.DataFrame(values, columns=["Component", "Occurance"])
+        values = values.drop_duplicates()
+        self.refDB = refDB
+        self.prodData = df.columns.tolist()
+        self.products = df
+        self.compData = values["Component"].tolist()
+        self.occuranceData = values
+
+    def __call__(self, product):
+        productData = self.products[product]
+        components = productData.to_numpy()
+        components = components[~pd.isnull(components)]
+        score = 0
+        for x in components:
+            tempScore = self.occuranceData.query(f"Component == '{x}'")
+            score += tempScore.Occurance.item() / len(self.prodData)
+            score
+
+        if self.refEngine == None:
+            offsets = np.random.randint(1, 6)
+        else:
+            with self.refEngine.begin() as con:
+                try:
+                    offsets = con.execute(
+                        f"SELECT * FROM 'products' WHERE product = '{product}' "
+                    ).fetchall()[0][1]
+                except:
+                    offsets = 1
+        return (self.refDB[product] * offsets, components, offsets, score)
+
+    def getProductData(self, product):
+        productData = self.products[product]
+        components = productData.to_numpy()
+        components = components[~pd.isnull(components)]
+        return components
 
 
 class KappaLoader:
@@ -235,10 +112,8 @@ class KappaLoader:
             data = data.loc[between_two_dates]
         data = data.dropna(subset=["Material"])
         self.data = data
-        engine = create_engine(f"sqlite:///{dbpath}")
-        with engine.begin() as con:
-            self.referenceData = pd.read_sql_table("products", con=con)
-            self.referenceData = self.referenceData["product"].tolist()
+        databaseloader = DataBaseLoader(Path(dbpath))
+        self.referenceData = databaseloader.prodData
 
     def __call__(self):
         return self.getData()
@@ -247,9 +122,10 @@ class KappaLoader:
         rmData = self.data[~self.data["Material"].isin(self.referenceData)][
             "Material"
         ].tolist()
-        warning(
-            f"REMOVING THE FOLLOWING ITEMS FROM LIST DUE TO LACK OF REFERENCE DATA: {rmData} "
-        )
+        if len(rmData) > 0:
+            warning(
+                f"REMOVING THE FOLLOWING ITEMS FROM LIST DUE TO LACK OF REFERENCE DATA: {rmData} "
+            )
         self.data = self.data[self.data["Material"].isin(self.referenceData)]
         sampleList = self.data["Material"].tolist()
         sampleReqs = self.data["VerursMenge"].tolist()
@@ -258,6 +134,9 @@ class KappaLoader:
 
 
 if __name__ == "__main__":
-    path = Path(os.getcwd() + os.path.normpath("/export.xlsx"))
-    loader = KappaLoader(path)
-    print(loader())
+    loader = DataBaseLoader(
+        r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\data\SMD_Material_Stueli.txt"
+    )
+
+    test = loader("24.AAR.AB")
+    test
