@@ -21,20 +21,16 @@ from torch.utils.tensorboard import SummaryWriter
 import random
 import torch
 import torch.nn as nn
-import itertools
 import shutil
-from sqlalchemy import create_engine
-from torchinfo import summary
+from sqlalchemy import engine
 import time
 from tqdm import tqdm
 from datetime import datetime
 from misc.deploy import DeployModel
-from torch.utils.data.dataloader import default_collate
-from torch.profiler import profile, record_function, ProfilerActivity
 
-from helper import Memory, UtilFunctions, Cartsetup, Coating
+from helper import Memory, UtilFunctions, Coating
 
-from misc.dataloader import DataLoader, DataBaseLoader, KappaLoader
+from misc.dataloader import DataBaseLoader, KappaLoader
 from misc.dataset import ProductDataloader, ProductDataset
 
 
@@ -54,6 +50,7 @@ class RunModel:
         overwriteDevice: Literal["cpu", "cuda:0"] = False,
         caching: bool = True,
         disableProgress: bool = False,
+        refEngine: engine = None,
     ) -> None:
         """Initiate the reinforcement learning model and training or prediction capabilities.
 
@@ -92,19 +89,14 @@ class RunModel:
         self.numSamples = numSamples
         self.allowDuplicates = allowDuplicates
 
-        self.engine = create_engine(f"sqlite:///{dbpath}")
         self.training = True
         self.disableProgress = disableProgress
-        dbData = self.engine.execute("SELECT * FROM 'products'").fetchall()
-        masterCompData = self.engine.execute("SELECT * FROM 'allcomponents'").fetchall()
-        prodData = []
-        for i in dbData:
-            prodData.append(i[0])
-        compData = []
-        for i in masterCompData:
-            compData.append(i[0].strip())
-
-        if exists(self.basepath / "cache.p") and caching:
+        cachePath = self.basepath / "cache.p"
+        if (
+            exists(cachePath)
+            and caching
+            and cachePath.stat().st_mtime > (time.time() - 86400)
+        ):
             try:
                 with open(self.basepath / "cache.p", "rb") as file:
                     self.products = pickle.load(file)
@@ -112,31 +104,27 @@ class RunModel:
                 raise FileNotFoundError(f"Unable to find: {self.basepath}/cache.p")
             info("Found cached data.")
         else:
-            info("No cached data found. Generating new dataset.")
+            info("No cached data found or cached data too old. Generating new dataset.")
             if exists(os.getcwd() + os.path.normpath("/FINAL MODEL")):
                 modelPath = Path(os.getcwd() + os.path.normpath("/FINAL MODEL"))
             else:
                 modelPath = Path(self.resource_path("bin/assets/final model"))
             self.model = DeployModel(modelPath)
-            for i in tqdm(prodData, disable=disableProgress):
+            dataloader = DataBaseLoader(Path(dbpath), refEngine)
+            for i in tqdm(dataloader.prodData, disable=disableProgress):
                 product = i
                 overallLen = 0
                 overallTime = 0
-                allComponents = []
                 for m in ["m10", "m20"]:
-
-                    dataloader = DataBaseLoader(self.engine, i, prodData)
-                    data, components, offsets, score = dataloader()
+                    data, components, offsets, score = dataloader(i)
                     rowOffsets = offsets / 2
                     rowOffsets = offsets / rowOffsets
-                    if len(data) == 0:
+                    if data == 0:
                         Ymax = 0
-                        Xmax = 0
                     else:
-                        Ymax = data["Y"].max() * rowOffsets
-                        Xmax = data["X"].max() * rowOffsets
+                        Ymax = np.random.randn() * rowOffsets
                     predArray = np.array(
-                        [len(data) * rowOffsets / 2, 0 if m == "m10" else 1, 0, 0]
+                        [data * rowOffsets / 2, 0 if m == "m10" else 1, 0, 0]
                     )
 
                     overallTime += self.model.predict(predArray).item()
@@ -144,10 +132,10 @@ class RunModel:
                 overallTime += Coating(Ymax * rowOffsets)
                 overallLen += len(data) * rowOffsets
 
-                comps = [compData.index(x.strip()) for x in components]
+                comps = [dataloader.compData.index(x.strip()) for x in components]
 
                 self.products[product] = {
-                    "len": overallLen,
+                    "len": len(comps),
                     "time": overallTime,
                     "score": score,
                     "comps": comps,
@@ -188,7 +176,9 @@ class RunModel:
         self.embedding_dimensions = EMBEDDING_DIMENSIONS
         self.embedding_iterations_t = EMBEDDING_ITERATIONS_T
         Q_net = QNetModel(
-            device=self.device, emb_dim=EMBEDDING_DIMENSIONS, T=EMBEDDING_ITERATIONS_T
+            device=self.device,
+            emb_dim=EMBEDDING_DIMENSIONS,
+            emb_it=EMBEDDING_ITERATIONS_T,
         )
         Q_net.to(self.device)
         optimizer = OPTIMIZER(Q_net.parameters(), lr=INIT_LR, **optim_args)
@@ -948,13 +938,14 @@ if __name__ == "__main__":
     torch.multiprocessing.set_start_method("spawn")
     START_TIME = time.perf_counter()
     EMBEDDING_DIMENSIONS = 16
-    EMBEDDING_ITERATIONS_T = 2
+    EMBEDDING_ITERATIONS_T = 4
     runmodel = RunModel(
-        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
+        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\data\SMD_Material_Stueli.txt",
         numSamples=24,
         tuning=False,
         allowDuplicates=False,
     )
+    exit()
     # runmodel.generateData()
 
     # all_lengths_fnames = [
@@ -984,6 +975,7 @@ if __name__ == "__main__":
         N_STEP_QL=4,
         BATCH_SIZE=16,
         GAMMA=0.7,
+        debug=True,
     )
     runmodel.plotMetrics()
 
