@@ -115,8 +115,8 @@ class RunModel:
                 product = i
                 overallLen = 0
                 overallTime = 0
+                data, components, offsets, score = dataloader(i)
                 for m in ["m10", "m20"]:
-                    data, components, offsets, score = dataloader(i)
                     rowOffsets = offsets / 2
                     rowOffsets = offsets / rowOffsets
                     if data == 0:
@@ -130,7 +130,7 @@ class RunModel:
                     overallTime += self.model.predict(predArray).item()
                 overallTime = overallTime / 2
                 overallTime += Coating(Ymax * rowOffsets)
-                overallLen += len(data) * rowOffsets
+                overallLen += data * rowOffsets
 
                 comps = [dataloader.compData.index(x.strip()) for x in components]
 
@@ -205,7 +205,6 @@ class RunModel:
         state_tsr = self.state2tens(current_state)
 
         if fname is not None:
-            info("Loading previous best model.")
             checkpoint = torch.load(fname)
             Q_net.load_state_dict(checkpoint["model"])
             optimizer.load_state_dict(checkpoint["optimizer"])
@@ -511,6 +510,7 @@ class RunModel:
         sampleSize = list(self.products.keys())
         sampleReqs = np.random.randint(1, 70, size=(len(sampleSize))).tolist()
         currentDict = []
+        clist = []
         for i in sampleSize:
             currentList = sampleSize.copy()
             currentList.remove(i)
@@ -518,7 +518,7 @@ class RunModel:
             simTime = self.products[i]["time"] if self.products[i]["time"] != 0 else 0
             if simTime > 1000:
                 simTime = simTime / 100
-
+            clist.append(self.products[i]["comps"])
             currentDict.append(
                 [
                     math.log(float(self.products[i]["len"])) / 10
@@ -529,16 +529,13 @@ class RunModel:
                     if self.products[i]["score"] != 0
                     else 0,
                     i,
-                    self.products[i]["comps"],
-                    float(len(self.products[i]["comps"])),
-                    req,
+                    # self.products[i]["comps"],
+                    # float(len(self.products[i]["comps"])),
+                    # req,
                 ]
             )
             del req, simTime, currentList
         currentDict = np.asarray(currentDict, dtype=object)
-        clist = []
-        for c in currentDict:
-            clist.append(c[4])
         clist = np.asarray(clist, dtype=object)
         max_len = np.max([len(a) for a in clist])
         clist = np.asarray(
@@ -587,7 +584,7 @@ class RunModel:
         self.rewards = []
         current_min_med_length = float("inf")
         Q_net = Q_net.float()
-        BATCH_SIZE = self.numSamples
+        # BATCH_SIZE = self.numSamples
         productDataset = ProductDataset(*self.generateData())
         productDataloader = ProductDataloader(
             productDataset,
@@ -729,17 +726,18 @@ class RunModel:
                     self.writer.add_scalar(
                         "LearningRate", Q_func.optimizer.param_groups[0]["lr"], t
                     )
-                    med_length = np.median(self.losses[-100:])
-                    if med_length < current_min_med_length:
-                        current_min_med_length = med_length
-                        self.checkpoint_model(
-                            Q_net,
-                            optimizer,
-                            lr_scheduler,
-                            loss,
-                            episode,
-                            med_length,
-                        )
+
+            med_length = np.median(self.losses[-100:])
+            if med_length < current_min_med_length:
+                current_min_med_length = med_length
+                self.checkpoint_model(
+                    Q_net,
+                    optimizer,
+                    lr_scheduler,
+                    loss,
+                    episode,
+                    med_length,
+                )
 
             length, solution = self.helper.total_distance(solution, W)
             if debug:
@@ -945,7 +943,7 @@ if __name__ == "__main__":
         tuning=False,
         allowDuplicates=False,
     )
-    exit()
+    # exit()
     # runmodel.generateData()
 
     # all_lengths_fnames = [
@@ -980,17 +978,17 @@ if __name__ == "__main__":
     runmodel.plotMetrics()
 
     END_TIME = time.perf_counter() - START_TIME
-
+    exit()
     path = Path(os.getcwd() + os.path.normpath("/2days.xlsx"))
 
     loader = KappaLoader(
         path,
-        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
+        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\data\SMD_Material_Stueli.txt",
     )
 
     # samples, sampleReqs = loader()
     runmodel = RunModel(
-        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
+        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\data\SMD_Material_Stueli.txt",
         numSamples=300,
         tuning=False,
         allowDuplicates=True,
@@ -1002,7 +1000,7 @@ if __name__ == "__main__":
     validate = Validate(
         best_value,
         best_solution,
-        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
+        dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\data\SMD_Material_Stueli.txt",
         calcGroups=False,
         overlapThreshhold=0.5,
     )
