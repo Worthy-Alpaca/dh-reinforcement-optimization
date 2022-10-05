@@ -67,6 +67,7 @@ class Controller(MyCanvas):
             validate=self.validate,
         )
         self.canvas.draw()
+        return
 
     def __plot_solution(self, coords: np.ndarray, solution: list, validate=False):
         """Method to plot the given coordinates according to the give solution.
@@ -158,7 +159,7 @@ class Controller(MyCanvas):
         )
         plot.set(
             xlabel="Number of placements",
-            ylabel="Number of Components",
+            ylabel="Simulated production time",
             zlabel="Cumulative Component Score",
         )
         # plot.xlabel("Number of placements")
@@ -179,6 +180,18 @@ class Controller(MyCanvas):
             coords[solution[0], 1],
             coords[solution[0], 2],
             "%s" % (str(first)),
+            size=10,
+            zorder=1,
+        )
+        last = solutionList[-1]
+        if type(last) == list:
+            last = last[-1]
+
+        plot.text(
+            coords[solution[-1], 0],
+            coords[solution[-1], 1],
+            coords[solution[-1], 2],
+            "%s" % (str(last)),
             size=10,
             zorder=1,
         )
