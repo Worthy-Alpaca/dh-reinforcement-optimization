@@ -19,7 +19,7 @@ class DataBaseLoader:
             pattern = re.compile("[0-9]{7}-[0-9]{1,}")
             x = x.replace(" ", "")
             if len(x) < 7:
-                return np.nan
+                return np.nan, 0
             if not header:
                 if not bool(re.match(pattern, x)):
                     return np.nan, 0
@@ -88,7 +88,7 @@ class DataBaseLoader:
                     ).fetchall()[0][1]
                 except:
                     offsets = 1
-        return (self.refDB[product] * offsets, components, offsets, score)
+        return (self.refDB[product], components, offsets, score)
 
     def getProductData(self, product):
         productData = self.products[product]
