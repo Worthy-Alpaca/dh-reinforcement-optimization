@@ -223,6 +223,13 @@ class Interface:
             )
             if datapath == None:
                 return self.__findDBPath()
+            cachePath = Path(
+                os.path.expanduser(
+                    os.path.normpath("~/Documents/D+H optimizer/cache.p")
+                )
+            )
+            if exists(cachePath):
+                os.remove(cachePath)
             self.dbpath = os.path.normpath(datapath)
             self.config.set("optimizer_backend", "dbpath", datapath)
             info("Successfully updated Database file.")
@@ -340,7 +347,9 @@ class Interface:
         best_time = -float("inf")
         best_value = any
         best_solution = any
-        for x in range(self.config.getint("default", "solutionIterator")):
+        solutionIterator = self.config.getint("default", "solutionIterator")
+        for x in range(solutionIterator):
+            info(f"Iteration {x+1}/{solutionIterator}")
             running_value, running_solution = runmodel.getBestOder(
                 sampleReqs=sampleReqs,
                 samples=samples,
