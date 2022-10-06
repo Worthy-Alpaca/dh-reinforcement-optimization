@@ -527,58 +527,8 @@ class Interface:
                 self.config.get("optimizer_backend", "dbpath")
             ),
         )
-        filemenu.add_command(label="Neues Produkt einfügen", command=self.__addNewData)
         filemenu.add_separator()
         filemenu.add_command(label="Optionen", command=self.__setOptions)
-
-    def __addNewData(self):
-        datapath = self.__openNew(
-            startPath=self.basePath,
-            filetypes=[
-                (
-                    "Excel Datei",
-                    ".xlsm .xls",
-                ),
-                ("Alle Dateien", "."),
-            ],
-        )
-
-        dataextender = DataExtender(self.config.get("optimizer_backend", "dbpath"))
-        success, productName = dataextender.checkDir(Path(datapath))
-        if success:
-            info("Product added successfully to database")
-            return self.controller.wait("Produkt erfolgreich in Datenbank aufgenommen.")
-        elif success == None:
-            top = self.__createToplevel(height=250, width=350)
-            bigframe = ttk.Frame(top)
-            bigframe.pack(side="top", fill="both", expand=1)
-            ttk.Label(
-                bigframe,
-                text=f"Bitte geben Sie die Anzahl der Abschaltungen\n pro Nutzen für das Produkt {productName} ein.",
-            ).pack(side="top", pady=5)
-            offsetEntryVar = tk.IntVar()
-            errorFrame = ttk.Frame(bigframe)
-            errorFrame.pack()
-            ttk.Entry(bigframe, textvariable=offsetEntryVar).pack(pady=5)
-
-            def getData():
-                numOffsets = offsetEntryVar.get()
-                if numOffsets == 0:
-                    ttk.Label(
-                        errorFrame,
-                        text="Bitte geben Sie eine Zahl größer als 0 ein.",
-                        foreground="red",
-                    ).pack()
-                    return
-                with dataextender.engine.begin() as con:
-                    con.execute(
-                        f"INSERT INTO 'products' (product, numOffsets) VALUES ('{productName}', {int(numOffsets)} )"
-                    )
-                    info("Product added successfully to database")
-                top.grab_release()
-                top.withdraw()
-
-            ttk.Button(bigframe, text="OK", command=getData).pack(pady=5)
 
     def __createButton(
         self,
