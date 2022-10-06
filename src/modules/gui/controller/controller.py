@@ -99,7 +99,7 @@ class Controller(MyCanvas):
         if not validate:
             textstr = (
                 textstr
-                + f"{len(solutionList)} Groups\nSaved {t} Minutes with Grouping\n"
+                + f"{len(solutionList)} Gruppen\n{t} Minuten durch Gruppierung gespart\n"
             )
         testArr = []
         for x in solutionList:
