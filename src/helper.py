@@ -169,7 +169,7 @@ class UtilFunctions:
 def Cartsetup(comps: list):
     time = 0
 
-    complexity = len(comps) / 36
+    complexity = 36 / len(comps)
     for i in range(len(comps)):
         time = ((60 + random.randint(0, 30)) * complexity + 9.8) + time
     return time
