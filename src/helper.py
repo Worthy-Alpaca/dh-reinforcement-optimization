@@ -171,7 +171,7 @@ def Cartsetup(comps: list):
 
     complexity = len(comps) / 36
     for i in range(len(comps)):
-        time = (60 + random.randint(0, 0) * complexity + 9.8) + time
+        time = ((60 + random.randint(0, 30)) * complexity + 9.8) + time
     return time
 
 
