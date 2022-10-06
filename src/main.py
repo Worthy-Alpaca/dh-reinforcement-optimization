@@ -64,7 +64,7 @@ class RunModel:
             else:
                 self.device = "cpu"
         else:
-            self.device = overwriteDevice
+            self.device = overwriteDevice.lower()
 
         self.folder_name = Path(
             os.path.expanduser(os.path.normpath("~/Documents/D+H optimizer/models"))
@@ -205,7 +205,7 @@ class RunModel:
         state_tsr = self.state2tens(current_state)
 
         if fname is not None:
-            checkpoint = torch.load(fname)
+            checkpoint = torch.load(fname, map_location=torch.device(self.device))
             Q_net.load_state_dict(checkpoint["model"])
             optimizer.load_state_dict(checkpoint["optimizer"])
             lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
