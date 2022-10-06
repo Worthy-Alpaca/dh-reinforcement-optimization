@@ -95,7 +95,12 @@ class Controller(MyCanvas):
         else:
             solutionList = solutionListOG
         groupTimings = 0
-        textstr = f"{len(solutionList)} Groups\nSaved {t} Minutes with Grouping\n"
+        textstr = ""
+        if not validate:
+            textstr = (
+                textstr
+                + f"{len(solutionList)} Groups\nSaved {t} Minutes with Grouping\n"
+            )
         testArr = []
         for x in solutionList:
             textstr += f"{x}\n"
