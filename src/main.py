@@ -96,6 +96,7 @@ class RunModel:
             exists(cachePath)
             and caching
             and cachePath.stat().st_mtime > (time.time() - 86400)
+            and Path(dbpath).stat().st_mtime > (time.time() - 86400)
         ):
             try:
                 with open(self.basepath / "cache.p", "rb") as file:
