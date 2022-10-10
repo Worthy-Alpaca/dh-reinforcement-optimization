@@ -26,6 +26,7 @@ class Controller(MyCanvas):
         self,
         best_value,
         best_solution,
+        samples,
         dbpath: str,
         refEngine: engine,
         calcGroups: bool = False,
@@ -64,12 +65,15 @@ class Controller(MyCanvas):
         groupTimings = self.__plot_solution(
             self.coords,
             self.solution,
+            samples,
             validate=self.validate,
         )
         self.canvas.draw()
         return
 
-    def __plot_solution(self, coords: np.ndarray, solution: list, validate=False):
+    def __plot_solution(
+        self, coords: np.ndarray, solution: list, shortText: np.ndarray, validate=False
+    ):
         """Method to plot the given coordinates according to the give solution.
 
         Args:
@@ -83,8 +87,12 @@ class Controller(MyCanvas):
         labels = labels[:, 0].tolist()
 
         solutionListOG = []
+        textShortStr = "\n"
         for x in solution:
-            solutionListOG.append(coords[x][3:4][0])
+            k = shortText[x, 1]
+            # solutionListOG.append(coords[x][3:4][0])
+            # textShortStr += f"{shortText[x, 1]}\n"
+            solutionListOG.append(f"{coords[x][3:4][0]} ->< {shortText[x, 1]}")
 
         t = 0
         l = len(solutionListOG)
@@ -96,110 +104,126 @@ class Controller(MyCanvas):
             solutionList = solutionListOG
         groupTimings = 0
         textstr = ""
+        textstr2 = ""
         if not validate:
             textstr = (
                 textstr
                 + f"{len(solutionList)} Gruppen\n{t} Minuten durch Gruppierung gespart\n"
             )
         testArr = []
+        # if not validate:
+        #     textShortStr = "\n\n"
         for x in solutionList:
             textstr += f"{x}\n"
             runningArr = []
-            if not validate:
-                for i in x:
-                    runningArr.append(labels.index(i))
-                testArr.append(runningArr)
+            # if not validate:
+            #     for i in x:
+            #         runningArr.append(shortText[labels.index(i)])
+            #     textShortStr += f"{runningArr}\n"
 
         coords = coords[:, :3].astype(np.float32)
-        plot = self.figure.add_subplot(121, projection="3d")
+        plot = self.figure.add_subplot(121)
         ax = self.figure.add_subplot(122)
         ax.axis("off")
-        plot.scatter(
-            coords[:, 0],
-            coords[:, 1],
-            coords[:, 2],
-        )
+        plot.axis("off")
+        # plot.scatter(
+        #     coords[:, 0],
+        #     coords[:, 1],
+        #     coords[:, 2],
+        # )
 
         n = len(coords)
-        ax.text(
+        plot.text(
             0.05,
             0.95,
             textstr,
+            transform=plot.transAxes,
+            fontsize=14,
+            verticalalignment="top",
+            wrap=True,
+            color="#ffffff" if self.dark else "#333333",
+        )
+        plot.set_title(
+            "model / overlap = %.5f s\n %s"
+            % (
+                self.helper.calc_total_time(
+                    self.solution,
+                )[0],
+                textstr2
+                # + groupTimings
+            ),
+            color="#ffffff" if self.dark else "#333333",
+        )
+
+        ax.text(
+            0.00,
+            0.95,
+            textShortStr,
             transform=ax.transAxes,
             fontsize=14,
             verticalalignment="top",
             wrap=True,
             color="#ffffff" if self.dark else "#333333",
         )
-        ax.set_title(
-            "model / overlap = %.5f s"
-            % (
-                self.helper.calc_total_time(
-                    self.solution,
-                )[0]
-                # + groupTimings
-            ),
-            color="#ffffff" if self.dark else "#333333",
-        )
 
-        for idx in range(n - 1):
-            i, next_i = solution[idx], solution[idx + 1]
-            plot.plot(
-                [coords[i, 0], coords[next_i, 0]],
-                [coords[i, 1], coords[next_i, 1]],
-                [coords[i, 2], coords[next_i, 2]],
-                "k",
-                lw=2,
-                alpha=0.8,
-            )
+        # for idx in range(n - 1):
+        #     i, next_i = solution[idx], solution[idx + 1]
+        #     plot.plot(
+        #         [coords[i, 0], coords[next_i, 0]],
+        #         [coords[i, 1], coords[next_i, 1]],
+        #         [coords[i, 2], coords[next_i, 2]],
+        #         "k",
+        #         lw=2,
+        #         alpha=0.8,
+        #     )
 
-        i, next_i = solution[-1], solution[0]
-        plot.plot(
-            [coords[i, 0], coords[next_i, 0]],
-            [coords[i, 1], coords[next_i, 1]],
-            [coords[i, 2], coords[next_i, 2]],
-            "k",
-            lw=2,
-            alpha=0.8,
-        )
-        plot.set(
-            xlabel="Number of placements",
-            ylabel="Simulated production time",
-            zlabel="Cumulative Component Score",
-        )
-        # plot.xlabel("Number of placements")
-        # plot.ylabel("Number of Components")
-        plot.plot(
-            coords[solution[0], 0],
-            coords[solution[0], 1],
-            coords[solution[0], 2],
-            "x",
-            markersize=10,
-        )
-        first = solutionList[0]
-        if type(first) == list:
-            first = first[0]
+        # i, next_i = solution[-1], solution[0]
+        # plot.plot(
+        #     [coords[i, 0], coords[next_i, 0]],
+        #     [coords[i, 1], coords[next_i, 1]],
+        #     [coords[i, 2], coords[next_i, 2]],
+        #     "k",
+        #     lw=2,
+        #     alpha=0.8,
+        # )
+        # plot.set(
+        #     xlabel="Number of placements",
+        #     ylabel="Simulated production time",
+        #     zlabel="Cumulative Component Score",
+        # )
+        # # plot.xlabel("Number of placements")
+        # # plot.ylabel("Number of Components")
+        # plot.plot(
+        #     coords[solution[0], 0],
+        #     coords[solution[0], 1],
+        #     coords[solution[0], 2],
+        #     "x",
+        #     markersize=10,
+        # )
+        # first = solutionList[0]
+        # if type(first) == list:
+        #     first = first[0]
 
-        plot.text(
-            coords[solution[0], 0],
-            coords[solution[0], 1],
-            coords[solution[0], 2],
-            "%s" % (str(first)),
-            size=10,
-            zorder=1,
-        )
-        last = solutionList[-1]
-        if type(last) == list:
-            last = last[-1]
+        # plot.text(
+        #     coords[solution[0], 0],
+        #     coords[solution[0], 1],
+        #     coords[solution[0], 2],
+        #     "%s" % (str(first)),
+        #     size=10,
+        #     zorder=1,
+        # )
+        # last = solutionList[-1]
+        # if type(last) == list:
+        #     last = last[-1]
 
-        plot.text(
-            coords[solution[-1], 0],
-            coords[solution[-1], 1],
-            coords[solution[-1], 2],
-            "%s" % (str(last)),
-            size=10,
-            zorder=1,
-        )
+        # plot.text(
+        #     coords[solution[-1], 0],
+        #     coords[solution[-1], 1],
+        #     coords[solution[-1], 2],
+        #     "%s" % (str(last)),
+        #     size=10,
+        #     zorder=1,
+        # )
         return groupTimings
 
     def wait(self, message: str = "") -> any:
@@ -260,9 +284,9 @@ class Controller(MyCanvas):
         dataloader = DataBaseLoader(self.dbpath)
         for i in range(len(solutionList)):
             product = solutionList[i]
-            Components = dataloader.getProductData(product)
+            Components = dataloader.getProductData(product[:9])
             try:
-                ComponentsNext = dataloader.getProductData(solutionList[i + 1])
+                ComponentsNext = dataloader.getProductData(solutionList[i + 1][:9])
             except:
                 ComponentsNext = []
             overlapComponents = list(set(Components) & set(ComponentsNext))

@@ -103,7 +103,7 @@ class KappaLoader:
     ) -> None:
         data = pd.read_excel(path)
 
-        data = data[["Unnamed: 3", "Material", "VerursMenge"]]
+        data = data[["Unnamed: 3", "Material", "VerursMenge", "Kurztext"]]
         data["Date"] = pd.to_datetime(data["Unnamed: 3"], errors="coerce")
         if startDate is not None and endDate is not None:
             after_start_date = data["Date"] >= pd.to_datetime(startDate)
@@ -111,7 +111,7 @@ class KappaLoader:
             between_two_dates = after_start_date & before_end_date
             data = data.loc[between_two_dates]
         data = data.dropna(subset=["Material"])
-        self.data = data
+        self.data = data.drop_duplicates()
         databaseloader = DataBaseLoader(Path(dbpath))
         self.referenceData = databaseloader.prodData
 
@@ -130,7 +130,11 @@ class KappaLoader:
         sampleList = self.data["Material"].tolist()
         sampleReqs = self.data["VerursMenge"].tolist()
 
-        return sampleList, sampleReqs
+        return (
+            sampleList,
+            sampleReqs,
+            self.data[["Material", "Kurztext"]].drop_duplicates().to_numpy(),
+        )
 
 
 if __name__ == "__main__":

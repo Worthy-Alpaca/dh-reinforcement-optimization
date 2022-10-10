@@ -45,7 +45,7 @@ class Interface:
         """Creates the interface and it's child modules."""
         self.masterframe = tk.Tk()
         self.masterframe.protocol("WM_DELETE_WINDOW", self.__onClose)
-        self.masterframe.minsize(width=1500, height=600)
+        self.masterframe.minsize(width=1500, height=700)
         self.masterframe.overrideredirect(True)
         if not exists(
             os.path.expanduser(os.path.normpath("~/Documents/D+H optimizer/settings"))
@@ -339,7 +339,7 @@ class Interface:
             startDate,
             endDate,
         )
-        samples, sampleReqs = loader.getData()
+        samples, sampleReqs, s_np = loader.getData()
         if exists(self.basePath + os.path.normpath("/models")):
             pathDir = self.basePath + os.path.normpath("/models")
         else:
@@ -365,6 +365,7 @@ class Interface:
         self.controller(
             best_value,
             best_solution,
+            s_np,
             dbpath=self.config.get("optimizer_backend", "dbpath"),
             calcGroups=self.config.getboolean("default", "calcgroups"),
             overlapThreshhold=0.5,
