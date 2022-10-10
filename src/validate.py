@@ -1,8 +1,12 @@
 from logging import info
-from helper import Memory, UtilFunctions, Cartsetup, Coating
 from matplotlib import pyplot as plt
 import numpy as np
 from sqlalchemy import create_engine
+
+try:
+    from helper import UtilFunctions
+except:
+    from src.helper import UtilFunctions
 
 
 class Validate:

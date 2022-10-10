@@ -12,9 +12,7 @@ from unittest import result
 import pickle
 import optuna
 from matplotlib import pyplot as plt
-from model import QNetModel
-from helper import QFunction
-from validate import Validate
+
 import numpy as np
 from scipy.spatial import distance_matrix
 from torch.utils.tensorboard import SummaryWriter
@@ -26,12 +24,23 @@ from sqlalchemy import engine
 import time
 from tqdm import tqdm
 from datetime import datetime
-from misc.deploy import DeployModel
 
-from helper import Memory, UtilFunctions, Coating
-
-from misc.dataloader import DataBaseLoader, KappaLoader
-from misc.dataset import ProductDataloader, ProductDataset
+try:
+    from model import QNetModel
+    from helper import QFunction
+    from validate import Validate
+    from misc.deploy import DeployModel
+    from helper import Memory, UtilFunctions, Coating
+    from misc.dataloader import DataBaseLoader, KappaLoader
+    from misc.dataset import ProductDataloader, ProductDataset
+except:
+    from src.model import QNetModel
+    from src.helper import QFunction
+    from src.validate import Validate
+    from src.misc.deploy import DeployModel
+    from src.helper import Memory, UtilFunctions, Coating
+    from src.misc.dataloader import DataBaseLoader, KappaLoader
+    from src.misc.dataset import ProductDataloader, ProductDataset
 
 
 #######################
@@ -193,17 +202,6 @@ class RunModel:
         self.writer = SummaryWriter(
             os.getcwd() + os.path.normpath(f"/tensorboard/{self.run_name}")
         )
-
-        coords, W_np, _ = self.getData()
-
-        W = torch.tensor(
-            W_np, dtype=torch.float, requires_grad=False, device=self.device
-        )
-        solution = [random.randint(0, coords.shape[0] - 1)]
-        current_state = self.State(
-            partial_solution=solution, W=W, coords=coords[:, :3].astype(np.float32)
-        )
-        state_tsr = self.state2tens(current_state)
 
         if fname is not None:
             checkpoint = torch.load(fname, map_location=torch.device(self.device))
