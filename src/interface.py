@@ -250,6 +250,7 @@ class Interface:
         self.config.set("default", "progressBar", "True")
         self.config.set("default", "darkmode", "true")
         self.config.set("default", "solutionIterator", "10")
+        self.config.set("default", "textSeparator", "|")
         self.config.add_section("optimizer_backend")
         self.config.set("optimizer_backend", "dbpath", "")
         self.config.set("optimizer_backend", "overlapThreshhold", "0.5")
@@ -366,6 +367,7 @@ class Interface:
             calcGroups=self.config.getboolean("default", "calcgroups"),
             overlapThreshhold=0.5,
             refEngine=self.refEngine,
+            textSeparator=self.config.get("default", "textSeparator"),
         )
         return
 
@@ -706,7 +708,7 @@ class Interface:
         Returns:
             tk.Toplevel: The created window.
         """
-        toplevel = self.__createToplevel(height=500, title="Optionen")
+        toplevel = self.__createToplevel(height=600, title="Optionen")
         menubar = Menubar(toplevel)
         menu = MenuCustom(menubar, "Erweitert")
         menu.add_command("Trainingsoptionen", command=self.__showTrainingOptions)
@@ -718,13 +720,16 @@ class Interface:
             numCart = numCarts.get()
             address = overlapThreshhold.get()
             solutionIt = solutionIterator.get()
+            sep = textSeparator.get()
             address = address.replace(",", ".")
             self.config.set("default", "numCarts", str(numCart))
             self.config.set("default", "solutionIterator", str(solutionIt))
             self.config.set("optimizer_backend", "overlapThreshhold", str(address))
+            self.config.set("default", "textSeparator", str(sep))
             info(f"Successfully set numCarts to {str(numCart)} ")
             info(f"Successfully set overlapThreshhold to {str(float(address) * 100)}% ")
             info(f"Successfully set solutionIterator to {str(solutionIt)} ")
+            info(f"Successfully set textSeparator to {str(sep)} ")
             toplevel.withdraw()
             toplevel.grab_release()
             return True
@@ -748,6 +753,12 @@ class Interface:
         solutionIterator = tk.IntVar()
         solutionIterator.set(self.config.get("default", "solutionIterator"))
         ttk.Entry(top, textvariable=solutionIterator).pack(pady=5)
+
+        ttk.Label(top, text="Trenner für MatID u. Kurztext").pack(pady=5)
+        ttk.Label(top, text="Kann alles sein", font=("", 10, "italic")).pack()
+        textSeparator = tk.StringVar()
+        textSeparator.set(self.config.get("default", "textSeparator"))
+        ttk.Entry(top, textvariable=textSeparator).pack(pady=5)
 
         ttk.Button(top, text="OK", command=callback).pack(pady=5)
 

@@ -30,6 +30,7 @@ class Controller(MyCanvas):
         refEngine: engine,
         calcGroups: bool = False,
         overlapThreshhold: float = 0.5,
+        textSeparator: str = "",
     ) -> None:
         """Creates the summary with the provided data.
 
@@ -42,6 +43,7 @@ class Controller(MyCanvas):
             prodName (str, optional): The Product name. Defaults to "".
         """
         self.figure.clear()
+        self.textSeparator = textSeparator
         self.best_value = best_value
         self.overlapThreshhold = overlapThreshhold
         self.solution = best_solution["solution"]
@@ -88,7 +90,9 @@ class Controller(MyCanvas):
         solutionListOG = []
         textShortStr = "\n"
         for x in solution:
-            solutionListOG.append(f"{coords[x][3:4][0]} | {shortText[x, 1]}")
+            solutionListOG.append(
+                f"{coords[x][3:4][0]} {self.textSeparator} {shortText[x, 1]}"
+            )
 
         t = 0
         l = len(solutionListOG)
