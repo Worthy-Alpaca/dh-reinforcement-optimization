@@ -9,6 +9,7 @@ import math
 import torch
 import random
 import time
+from tqdm import tqdm
 from src.helper import UtilFunctions
 from src.main import RunModel
 
@@ -245,7 +246,7 @@ productDataloader = ProductDataloader(
     NUM_SAMPLES,
     shuffle=True,
     num_workers=4,
-    drop_last=True,
+    drop_last=False,
     persistent_workers=True,
     pin_memory=True,
 )
@@ -289,7 +290,7 @@ if __name__ == "__main__":
         EMBEDDING_DIMENSIONS=emb,
         EMBEDDING_ITERATIONS_T=it,
     )
-    for coords, W_np, components in iter(productDataloader):
+    for coords, W_np, components in tqdm(iter(productDataloader)):
         coords_list, W_np, components = coords.tolist(), W_np, components
         W = torch.tensor(
             W_np, dtype=torch.float, requires_grad=False, device=runmodel.device
@@ -336,7 +337,7 @@ if __name__ == "__main__":
         """ Neural Network"""
         START_TIME = time.perf_counter()
         best_overlap = -float("inf")
-        for x in range(ITERATIONS * ITERATIONS):
+        for x in range(ITERATIONS):
             total_overlap = validation.neuralNetwork(coords, runmodel, Q_func)
             if total_overlap > best_overlap:
                 best_overlap = total_overlap
@@ -361,7 +362,7 @@ if __name__ == "__main__":
     plt.plot(running_time_AN, label="Annealing Algorithm")
     plt.legend()
     plt.xlabel("Batch Nummer")
-    plt.ylabel("Berechnete gesparte Zeit durch Überschneidung in Sekunden")
+    plt.ylabel("Benötigte Rechenzeit für 10 Iterationen in Sekunden")
     plt.show()
 
     # t_bf = timeit(stmt="out[0]=brute_force({0})".format(cities), setup=setup, number=1)
