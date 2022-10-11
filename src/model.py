@@ -1,8 +1,6 @@
 import torch
-import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-from scipy.spatial import distance_matrix
 
 
 class QNetModel(nn.Module):

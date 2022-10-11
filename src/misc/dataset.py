@@ -1,7 +1,7 @@
-import torch
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
+import torch
 from scipy.spatial import distance_matrix
+from torch.utils.data import Dataset, DataLoader
 
 
 class ProductDataset(Dataset):

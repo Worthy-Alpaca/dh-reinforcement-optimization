@@ -21,7 +21,7 @@ class Tuner:
         self,
         direction: Literal["minimize", "maximize"] = "maximize",
         sampler: optuna.samplers = optuna.samplers.TPESampler,
-        pruner: optuna.pruners = optuna.pruners.HyperbandPruner,
+        pruner: optuna.pruners = optuna.pruners.PercentilePruner,
     ) -> optuna.study:
         """Class to initiate a Model tuning session.
         Args:
@@ -35,11 +35,11 @@ class Tuner:
         """
         self.study = optuna.create_study(
             load_if_exists=True,
-            study_name="optimizer_50t_p1",
+            study_name="optimizer_100_final_2",
             direction=direction,
             sampler=sampler(),
-            pruner=pruner(),
-            storage="sqlite:///50Studies_p1.db",
+            pruner=optuna.pruners.HyperbandPruner(),
+            storage="sqlite:///50Studies_p4.db",
         )
 
     def optimize(
@@ -55,7 +55,14 @@ class Tuner:
         self.study.optimize(
             self.__objective,
             n_trials=n_trials,
-            catch=(RuntimeError, RuntimeWarning, TypeError, ValueError, AssertionError),
+            catch=(
+                RuntimeError,
+                RuntimeWarning,
+                TypeError,
+                ValueError,
+                AssertionError,
+                OSError,
+            ),
             callbacks=[
                 self.__logging_callback,
                 MaxTrialsCallback(
@@ -76,29 +83,26 @@ class Tuner:
             float: The current objective. Either accuracy or loss
         """
         params = {
-            "learning_rate": trial.suggest_float("learning_rate", 1e-6, 9e-3),
-            "optimizer": trial.suggest_categorical(
-                "optimizer", ["Adamax", "ASGD", "Adam", "Adamax"]
-            ),
+            "learning_rate": trial.suggest_float("learning_rate", 0.003, 0.005),
+            "optimizer": trial.suggest_categorical("optimizer", ["Adam"]),
             "loss_function": trial.suggest_categorical(
                 "loss_function",
                 [
                     # "FocalTverskyLoss",
                     # "TverskyLoss",
                     "L1Loss",
-                    "MSELoss",
                     "HuberLoss",
                 ],
             ),
-            "batch_size": trial.suggest_int("batch_size", 8, 32),
-            "embed_dimensions": trial.suggest_int("embed_dimensions", 8, 32),
-            "embed_iterations": trial.suggest_int("embed_iterations", 1, 4),
-            "weight_decay": trial.suggest_float("weight_decay", 9e-5, 9e-2),
-            "dampening": trial.suggest_float("dampening", 1e-1, 7e-1),
-            "momentum": trial.suggest_float("momentum", 2e-1, 4e-1),
-            "gamma": trial.suggest_float("gamma", 0.4, 0.8),
+            "batch_size": trial.suggest_int("batch_size", 22, 24),
+            "embed_dimensions": trial.suggest_int("embed_dimensions", 15, 30),
+            "embed_iterations": trial.suggest_int("embed_iterations", 2, 3),
+            "weight_decay": trial.suggest_float("weight_decay", 0.04, 0.05),
+            "dampening": trial.suggest_float("dampening", 0.48, 0.52),
+            "momentum": trial.suggest_float("momentum", 0.28, 0.32),
+            "gamma": trial.suggest_float("gamma", 0.64, 0.66),
             "min_epsilon": trial.suggest_float("min_epsilon", 0.2, 0.8),
-            "epsilon_decay": trial.suggest_float("epsilon_decay", 6e-5, 6e-3),
+            "epsilon_decay": trial.suggest_float("epsilon_decay", 0.4, 0.6),
         }
 
         loss = self.tuneModel(params, trial)
@@ -116,12 +120,13 @@ class Tuner:
         Returns:
             tuple[torch.tensor  float, torch.Tensor  float]: Mean Loss and Accuracy for validation.
         """
-        print("Starting Trial: ", trial.number)
+        if trial is not None:
+            print("Starting Trial: ", trial.number)
         params["loss_function"] = getattr(nn, params["loss_function"])
 
-        random.seed(1000)
-        np.random.seed(1000)
-        torch.manual_seed(1000)
+        # random.seed(1000)
+        # np.random.seed(1000)
+        # torch.manual_seed(1000)
 
         optim_args = {
             "weight_decay": params["weight_decay"],
@@ -130,9 +135,9 @@ class Tuner:
         }
 
         runmodel = RunModel(
-            dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\products.db",
+            dbpath=r"V:\transfer\SAP\SMD\SMD_Material_Stueli.txt",
             numSamples=params["batch_size"],
-            tuning=True,
+            tuning=False,
             allowDuplicates=False,
         )
         try:
@@ -158,17 +163,18 @@ class Tuner:
             Q_net=QNet,
             optimizer=Adam,
             lr_scheduler=ExponentialLR,
-            NR_EPISODES=1000,
+            NR_EPISODES=3000,
             MIN_EPSILON=params["min_epsilon"],
             EPSILON_DECAY_RATE=params["epsilon_decay"],
             N_STEP_QL=4,
             BATCH_SIZE=params["batch_size"],
             GAMMA=0.7,
             trial=trial,
+            debug=True,
         )
 
         if saveState:
-            self.saveBestTrial(params)
+            runmodel.plotMetrics()
 
         return median_loss
 
@@ -238,7 +244,17 @@ if __name__ == "__main__":
         pass
     STUDY_PATH = Path(os.getcwd() + os.path.normpath("/data/model/studies/50TrialsP1"))
 
-    tuner = Tuner(direction="minimize", sampler=optuna.samplers.CmaEsSampler)
-    best_trial = tuner.optimize(n_trials=50)
+    tuner = Tuner(direction="minimize")
+    # best_trial = tuner.optimize(n_trials=100)
+
+    study = optuna.load_study(
+        storage="sqlite:///50studies_p4 - Kopie.db", study_name="optimizer_100_final"
+    )
+
+    params = study.best_trial.params
+    print(params)
+
+    tuner.tuneModel(params, None, True)
+
     # tuner.saveStudy(STUDY_PATH)
     # study = tuner.loadStudy(STUDY_LOAD)

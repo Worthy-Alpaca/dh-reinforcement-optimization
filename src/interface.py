@@ -1,25 +1,21 @@
-from pathlib import Path
-import sys
-import os
-import json
 import configparser
+import json
+import logging
+import os
+import random
+import sys
 import threading
 import torch
-import random
-import logging
 import numpy as np
-import ctypes as ct
 import tkinter as tk
 from tkinter import *
-from types import FunctionType
-from sqlalchemy import create_engine
-from tkinter import Grid, filedialog, PhotoImage, ttk
-from tkcalendar import Calendar
-from os.path import exists
 from logging import info, warning
-
-from misc.dataloader import KappaLoader
-from modules.extra.dataextender import DataExtender
+from os.path import exists
+from pathlib import Path
+from sqlalchemy import create_engine
+from tkcalendar import Calendar
+from tkinter import Grid, filedialog, PhotoImage, ttk
+from types import FunctionType
 
 
 PACKAGE_PARENT = "../"
@@ -30,12 +26,12 @@ sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
 from main import RunModel
 from helper import TextRedirector
+from misc.dataloader import KappaLoader
 
 try:
     from src.modules.gui.controller.controller import Controller
     from src.modules.gui.parent.menubar import Titlebar, Menubar, MenuCustom
 except:
-    from modules.gui.parent.canvas import MyCanvas
     from modules.gui.controller.controller import Controller
     from modules.gui.parent.menubar import Titlebar, Menubar, MenuCustom
 

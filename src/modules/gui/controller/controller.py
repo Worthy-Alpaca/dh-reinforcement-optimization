@@ -1,11 +1,10 @@
-import random
-import tkinter as tk
-import pandas as pd
 import numpy as np
-from sqlalchemy import create_engine, engine
-from logging import info
+import tkinter as tk
 from helper import UtilFunctions
+from logging import info
 from matplotlib.pyplot import style
+from sqlalchemy import engine
+
 
 try:
     from src.modules.gui.parent.canvas import MyCanvas

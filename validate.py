@@ -1,31 +1,18 @@
-from itertools import permutations
-from random import randint
-from timeit import timeit
-import pickle
-import os
-from pathlib import Path
-import numpy as np
 import math
-import torch
+import numpy as np
+import os
+import pickle
 import random
 import time
+import torch
+from itertools import permutations
+from pathlib import Path
 from tqdm import tqdm
+
 from src.helper import UtilFunctions
 from src.main import RunModel
-
 from src.misc.dataset import ProductDataloader, ProductDataset
 
-#  complex numbers are used to represent cities because python has them built-in.
-#  could easily be changed to 2-tuples by changing random_cities and leg_cost
-
-# def random_cities(n,max_x=100,max_y=100):
-#     '''return set of n cities randomly placed on a max_x by max_y grid.'''
-
-#     cities = set()
-#     while len(cities) < n:
-#         cities.add(complex(randint(0,max_x),randint(0,max_y)))
-
-#     return cities
 basepath = Path(os.path.expanduser(os.path.normpath("~/Documents/D+H optimizer/")))
 
 
@@ -364,23 +351,3 @@ if __name__ == "__main__":
     plt.xlabel("Batch Nummer")
     plt.ylabel("Benötigte Rechenzeit für 10 Iterationen in Sekunden")
     plt.show()
-
-    # t_bf = timeit(stmt="out[0]=brute_force({0})".format(cities), setup=setup, number=1)
-    # c_bf = path_cost(out[0])
-
-    # t_nn = timeit(
-    #     stmt="out[0]=nearest_neighbor({0})".format(cities), setup=setup, number=1
-    # )
-    # c_nn = path_cost(out[0])
-
-    # tdelta = 100 * (t_nn - t_bf) / t_bf
-    # cdelta = 100 * (c_nn - c_bf) / c_bf
-
-    # print(
-    #     """Number of cities: {ncities}
-    #                     time       cost
-    # brute_force     : {t_bf:8.1e}  {c_bf:8.2}
-    # nearest_neighbor: {t_nn:8.1e}  {c_nn:8.2}
-    # difference      : {tdelta:8.1f}% {cdelta:8.1f}%
-    # """
-    # ).format(**locals())

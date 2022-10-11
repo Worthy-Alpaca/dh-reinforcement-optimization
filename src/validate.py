@@ -1,6 +1,6 @@
+import numpy as np
 from logging import info
 from matplotlib import pyplot as plt
-import numpy as np
 from sqlalchemy import create_engine
 
 try:
