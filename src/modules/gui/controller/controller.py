@@ -89,10 +89,7 @@ class Controller(MyCanvas):
         solutionListOG = []
         textShortStr = "\n"
         for x in solution:
-            k = shortText[x, 1]
-            # solutionListOG.append(coords[x][3:4][0])
-            # textShortStr += f"{shortText[x, 1]}\n"
-            solutionListOG.append(f"{coords[x][3:4][0]} ->< {shortText[x, 1]}")
+            solutionListOG.append(f"{coords[x][3:4][0]} | {shortText[x, 1]}")
 
         t = 0
         l = len(solutionListOG)
@@ -101,66 +98,52 @@ class Controller(MyCanvas):
             t = l - len(solutionList)
             t = t * 20
         else:
-            solutionList = solutionListOG
+            solutionList = []
         groupTimings = 0
         textstr = ""
-        textstr2 = ""
         if not validate:
-            textstr = (
-                textstr
-                + f"{len(solutionList)} Gruppen\n{t} Minuten durch Gruppierung gespart\n"
+            textShortStr = (
+                f"{len(solutionList)} Gruppen\n{t} Minuten durch Gruppierung gespart\n"
             )
-        testArr = []
-        # if not validate:
-        #     textShortStr = "\n\n"
-        for x in solutionList:
+            for x in solutionList:
+                textShortStr += f"{x}\n"
+
+        for x in solutionListOG:
             textstr += f"{x}\n"
-            runningArr = []
-            # if not validate:
-            #     for i in x:
-            #         runningArr.append(shortText[labels.index(i)])
-            #     textShortStr += f"{runningArr}\n"
 
         coords = coords[:, :3].astype(np.float32)
         plot = self.figure.add_subplot(121)
         ax = self.figure.add_subplot(122)
         ax.axis("off")
         plot.axis("off")
-        # plot.scatter(
-        #     coords[:, 0],
-        #     coords[:, 1],
-        #     coords[:, 2],
-        # )
 
-        n = len(coords)
         plot.text(
-            0.05,
+            -0.2,
             0.95,
             textstr,
             transform=plot.transAxes,
-            fontsize=14,
+            fontsize=12,
             verticalalignment="top",
             wrap=True,
             color="#ffffff" if self.dark else "#333333",
         )
         plot.set_title(
-            "model / overlap = %.5f s\n %s"
+            "model / overlap = %.5f s"
             % (
                 self.helper.calc_total_time(
                     self.solution,
                 )[0],
-                textstr2
                 # + groupTimings
             ),
             color="#ffffff" if self.dark else "#333333",
         )
 
         ax.text(
-            0.00,
+            0.05,
             0.95,
             textShortStr,
             transform=ax.transAxes,
-            fontsize=14,
+            fontsize=12,
             verticalalignment="top",
             wrap=True,
             color="#ffffff" if self.dark else "#333333",
@@ -224,6 +207,7 @@ class Controller(MyCanvas):
         #     size=10,
         #     zorder=1,
         # )
+
         return groupTimings
 
     def wait(self, message: str = "") -> any:
@@ -283,7 +267,7 @@ class Controller(MyCanvas):
         solutionListReturn = []
         dataloader = DataBaseLoader(self.dbpath)
         for i in range(len(solutionList)):
-            product = solutionList[i]
+            product = solutionList[i][:9]
             Components = dataloader.getProductData(product[:9])
             try:
                 ComponentsNext = dataloader.getProductData(solutionList[i + 1][:9])
