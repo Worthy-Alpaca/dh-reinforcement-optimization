@@ -59,11 +59,7 @@ class Controller(MyCanvas):
             self.validate = True
         self.helper = UtilFunctions(self.components)
 
-        info(
-            f"The best value for this iteration is: {self.best_value}",
-        )
-
-        groupTimings = self.__plot_solution(
+        self.__plot_solution(
             self.coords,
             self.solution,
             samples,
@@ -102,7 +98,6 @@ class Controller(MyCanvas):
             t = t * 20
         else:
             solutionList = []
-        groupTimings = 0
         textstr = ""
         if not validate:
             textShortStr = (
@@ -151,6 +146,8 @@ class Controller(MyCanvas):
             wrap=True,
             color="#ffffff" if self.dark else "#333333",
         )
+
+        info(f"Calculated the best solution:\n{textstr}")
 
         # for idx in range(n - 1):
         #     i, next_i = solution[idx], solution[idx + 1]
@@ -211,7 +208,7 @@ class Controller(MyCanvas):
         #     zorder=1,
         # )
 
-        return groupTimings
+        return
 
     def wait(self, message: str = "") -> any:
         """Function that displays a loading screen."""
