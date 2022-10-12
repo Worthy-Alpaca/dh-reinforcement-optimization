@@ -310,9 +310,12 @@ class Controller(MyCanvas):
         numComponents = 0
         for i in components:
             with self.refEngine.begin() as connection:
-                result = connection.execute(
-                    f"SELECT * FROM 'ReferenceComponents' WHERE Component = '{i}'"
-                ).first()
+                try:
+                    result = connection.execute(
+                        f"SELECT * FROM 'ReferenceComponents' WHERE Component = '{i}'"
+                    ).first()
+                except:
+                    result = None
                 if result == None:
                     result = {"Feedersize": 8}
                 else:
