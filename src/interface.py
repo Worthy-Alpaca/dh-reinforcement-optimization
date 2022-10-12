@@ -255,10 +255,10 @@ class Interface:
         self.config.set("optimizer_backend", "dbpath", "")
         self.config.set("optimizer_backend", "overlapThreshhold", "0.5")
         self.config.add_section("model_training")
-        self.config.set("model_training", "trainingSamples", "13")
+        self.config.set("model_training", "trainingSamples", "24")
         self.config.set("model_training", "trainingEpisodes", "500")
-        self.config.set("model_training", "batch_size", "16")
-        self.config.set("model_training", "gamma", "0.7")
+        self.config.set("model_training", "batch_size", "24")
+        self.config.set("model_training", "gamma", "0.64")
 
     def __call__(self, *args: any, **kwds: any) -> None:
         """Call this to initate the window."""
@@ -350,7 +350,7 @@ class Interface:
             running_value, running_solution = runmodel.getBestOder(
                 sampleReqs=sampleReqs,
                 samples=samples,
-                plot=True,
+                plot=False,
                 numCarts=self.config.getint("default", "numCarts"),
                 modelFolder=pathDir,
             )
@@ -387,13 +387,21 @@ class Interface:
                 dbpath=self.config.get("optimizer_backend", "dbpath"),
                 numSamples=self.config.getint("model_training", "trainingSamples"),
                 caching=self.config.getboolean("default", "useCache"),
+                overwriteDevice="cpu",
             )
-            EMBEDDING_DIMENSIONS = 10
+            EMBEDDING_DIMENSIONS = 28
             EMBEDDING_ITERATIONS_T = 2
+            optim_args = {
+                "weight_decay": 0.042270035169263205,
+                "eps": 0.2832233236834357,
+            }
             Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
                 EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
                 EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
+                INIT_LR=0.0036528384837269156,
                 OPTIMIZER=torch.optim.Adam,
+                loss_func=torch.nn.HuberLoss,
+                optim_args=optim_args,
             )
             runmodel.fit(
                 Q_func=Q_Function,
@@ -401,11 +409,12 @@ class Interface:
                 optimizer=Adam,
                 lr_scheduler=ExponentialLR,
                 NR_EPISODES=self.config.getint("model_training", "trainingEpisodes"),
-                MIN_EPSILON=0.7,
-                EPSILON_DECAY_RATE=6e-4,
+                MIN_EPSILON=0.731744464273397,
+                EPSILON_DECAY_RATE=0.44184466917502785,
                 N_STEP_QL=4,
                 BATCH_SIZE=self.config.getint("model_training", "batch_size"),
                 GAMMA=self.config.getfloat("model_training", "gamma"),
+                debug=True,
             )
         else:
             return
@@ -619,7 +628,7 @@ class Interface:
         self.__createButton(
             8,
             1,
-            text="Model trainieren",
+            text="Modell trainieren",
             master=self.formbar,
             function=self.__trainModel,
             margin=50,
@@ -651,7 +660,7 @@ class Interface:
         ttk.Button(top, text="OK", command=lambda: getDate(cal)).pack()
 
     def __showTrainingOptions(self):
-        toplevel = self.__createToplevel(height=500, title="Erweitert")
+        toplevel = self.__createToplevel(height=300, title="Erweitert")
         top = ttk.Frame(toplevel)
         top.pack(side="top", expand=1, fill="both")
 
@@ -662,14 +671,9 @@ class Interface:
             self.config.set(
                 "model_training", "trainingEpisodes", str(trainingEpisodes.get())
             )
-            self.config.set("model_training", "batch_size", str(batch_size.get()))
-            gammaFixed = gamma.get().replace(",", ".")
-            self.config.set("model_training", "gamma", str(gammaFixed))
 
             info(f"Successfully set trainingSamples to {str(trainingSamples.get())}")
             info(f"Successfully set trainingEpisodes to {str(trainingEpisodes.get())}")
-            info(f"Successfully set batch_size to {str(batch_size.get())}")
-            info(f"Successfully set gamma to {str(gammaFixed)}")
 
             toplevel.grab_release()
             toplevel.withdraw()
@@ -685,20 +689,6 @@ class Interface:
         trainingEpisodes = tk.IntVar()
         trainingEpisodes.set(self.config.getint("model_training", "trainingEpisodes"))
         ttk.Entry(top, textvariable=trainingEpisodes).pack(pady=5)
-
-        ttk.Label(top, text="Batch größe").pack(pady=5)
-        ttk.Label(top, text="Muss eine Ganzzahl sein.", font=("", 10, "italic")).pack()
-        batch_size = tk.IntVar()
-        batch_size.set(self.config.getint("model_training", "batch_size"))
-        ttk.Entry(top, textvariable=batch_size).pack(pady=5)
-
-        ttk.Label(top, text="Größe für gamma").pack(pady=5)
-        ttk.Label(
-            top, text="Muss eine Dezimalzahl unter 1 sein.", font=("", 10, "italic")
-        ).pack()
-        gamma = tk.StringVar()
-        gamma.set(self.config.getfloat("model_training", "gamma"))
-        ttk.Entry(top, textvariable=gamma).pack(pady=5)
 
         ttk.Button(top, text="OK", command=callback).pack(pady=5)
 
