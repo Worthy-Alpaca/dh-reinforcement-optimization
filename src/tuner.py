@@ -131,7 +131,6 @@ class Tuner:
         optim_args = {
             "weight_decay": params["weight_decay"],
             "eps": params["momentum"],
-            "dampening": params["momentum"],
         }
 
         runmodel = RunModel(
@@ -145,6 +144,7 @@ class Tuner:
                 # fname=os.path.join(runmodel.folder_name, shortest_fname),
                 EMBEDDING_DIMENSIONS=params["embed_dimensions"],
                 EMBEDDING_ITERATIONS_T=params["embed_iterations"],
+                INIT_LR=params["learning_rate"],
                 OPTIMIZER=getattr(torch.optim, params["optimizer"]),
                 optim_args=optim_args,
                 loss_func=params["loss_function"],
@@ -154,6 +154,7 @@ class Tuner:
                 # fname=os.path.join(runmodel.folder_name, shortest_fname),
                 EMBEDDING_DIMENSIONS=params["embed_dimensions"],
                 EMBEDDING_ITERATIONS_T=params["embed_iterations"],
+                INIT_LR=params["learning_rate"],
                 OPTIMIZER=getattr(torch.optim, params["optimizer"]),
                 loss_func=params["loss_function"],
             )
