@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 from src.helper import UtilFunctions
 from src.main import RunModel
+from src.misc.dataloader import KappaLoader
 from src.misc.dataset import ProductDataloader, ProductDataset
 
 basepath = Path(os.path.expanduser(os.path.normpath("~/Documents/D+H optimizer/")))
@@ -277,13 +278,59 @@ if __name__ == "__main__":
         EMBEDDING_DIMENSIONS=emb,
         EMBEDDING_ITERATIONS_T=it,
     )
+    testpath = Path(r"C:\Users\stephan.schumacher\Documents\validation\prev")
+
+    for file in os.listdir(testpath):
+
+        loader = KappaLoader(
+            testpath / file,
+            dbpath=r"C:\Users\stephan.schumacher\Documents\repos\dh-reinforcement-optimization\data\SMD_Material_Stueli.txt",
+        )
+
+        samples, sampleReqs, s_np = loader.getData()
+
+        _, best = runmodel.getBestOder(samples=samples, sampleReqs=sampleReqs)
+
+        total_overlapAI, _ = runmodel.helper.calc_total_time(best["solution"])
+
+        sampleSet = list(range(len(set(samples))))
+        totalOverlapPrev, _ = runmodel.helper.calc_total_time(sampleSet)
+
+        running_data_NN.append(total_overlapAI)
+        running_data_AN.append(totalOverlapPrev)
+
+        random_solution = np.random.choice(
+            len(sampleSet),
+            size=len(sampleSet),
+            replace=False,
+        )
+        runningOverlapRand, _ = runmodel.helper.calc_total_time(sampleSet)
+        running_data_CS.append(runningOverlapRand)
+
+    import matplotlib.pyplot as plt
+
+    plt.plot(running_data_NN, label="KI Lösung")
+    plt.plot(running_data_AN, label="Manuelle Lösung")
+    plt.plot(running_data_CS, label="Zufällige Lösung")
+    plt.legend()
+    plt.xlabel("Test Nummer")
+    plt.ylabel("Berechnete gesparte Zeit durch Überschneidung in Sekunden")
+    plt.show()
+
+    running_data_NN2 = []
+    running_data_AN2 = []
+    running_data_CS2 = []
+
+    # exit()
     for coords, W_np, components in tqdm(iter(productDataloader)):
         coords_list, W_np, components = coords.tolist(), W_np, components
         W = torch.tensor(
             W_np, dtype=torch.float, requires_grad=False, device=runmodel.device
         )
-        helper = UtilFunctions(components)
+
         validation = ValidationTest(components, W_np)
+        helper = UtilFunctions(components)
+
         """ Nearest Neighbor """
         START_TIME = time.perf_counter()
         best_overlap = -float("inf")
