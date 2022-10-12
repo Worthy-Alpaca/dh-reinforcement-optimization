@@ -166,6 +166,7 @@ class RunModel:
         optim_args: dict = {},
         loss_func: FunctionType = torch.nn.MSELoss,
         LR_DECAY_RATE: float = 1.0 - 2e-5,
+        debug: bool = True,
     ):
         """Initiate the model state loading. If no `fname` is given, a new model will be initialized.
 
@@ -196,9 +197,10 @@ class RunModel:
         self.run_name = (
             f"{OPTIMIZER.__class__.__name__}_{EMBEDDING_DIMENSIONS}@{timestamp}"
         )
-        self.writer = SummaryWriter(
-            os.getcwd() + os.path.normpath(f"/tensorboard/{self.run_name}")
-        )
+        if debug:
+            self.writer = SummaryWriter(
+                os.getcwd() + os.path.normpath(f"/tensorboard/{self.run_name}")
+            )
 
         if fname is not None:
             checkpoint = torch.load(fname, map_location=torch.device(self.device))
@@ -845,6 +847,7 @@ class RunModel:
             os.path.join(modelFolder, shortest_fname),
             EMBEDDING_DIMENSIONS=emb,
             EMBEDDING_ITERATIONS_T=it,
+            debug=plot,
         )
         best_solution = {}
         best_value = float("inf")
