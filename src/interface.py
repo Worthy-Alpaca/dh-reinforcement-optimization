@@ -340,7 +340,7 @@ class Interface:
         if exists(self.basePath + os.path.normpath("/models")):
             pathDir = self.basePath + os.path.normpath("/models")
         else:
-            pathDir = self.resource_path("/bin/assets/models")
+            pathDir = self.resource_path("bin/assets/models")
         best_time = -float("inf")
         best_value = any
         best_solution = any
