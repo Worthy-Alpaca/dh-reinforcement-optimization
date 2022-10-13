@@ -11,5 +11,6 @@ The program is compiled to EXE using `auto-py-to-exe`. The included `exegenerati
 Inno Setup Compiler was used to create an installer, using the included `d+h conversion.iss` file.
 
 
-_Credit goes to unit8co for the base code._
-_Modifications where made under the included GNU GENERAL PUBLIC LICENSE_
+*Credit goes to unit8co for the base code.*
+
+*Modifications where made under the included GNU GENERAL PUBLIC LICENSE*

@@ -1,1 +1,1 @@
-pdoc .\src\ --logo .\src\assets\logo.ico --docformat google --output-dir docs
+pdoc .\src\ --docformat google --output-dir docs
