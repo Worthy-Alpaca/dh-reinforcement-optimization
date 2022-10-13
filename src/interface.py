@@ -24,16 +24,18 @@ SCRIPT_DIR = os.path.dirname(
 )
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
-from main import RunModel
-from helper import TextRedirector
-from misc.dataloader import KappaLoader
-
 try:
-    from src.modules.gui.controller.controller import Controller
-    from src.modules.gui.parent.menubar import Titlebar, Menubar, MenuCustom
+    from src.helper import TextRedirector
+    from src.main import RunModel
+    from src.misc.dataloader import KappaLoader
+    from src.modules.controller.controller import Controller
+    from src.modules.parent.menubar import Titlebar, Menubar, MenuCustom
 except:
-    from modules.gui.controller.controller import Controller
-    from modules.gui.parent.menubar import Titlebar, Menubar, MenuCustom
+    from helper import TextRedirector
+    from main import RunModel
+    from misc.dataloader import KappaLoader
+    from modules.controller.controller import Controller
+    from modules.parent.menubar import Titlebar, Menubar, MenuCustom
 
 
 class Interface:
@@ -157,6 +159,14 @@ class Interface:
             self.__findDBPath()
 
     def resource_path(self, relative_path):
+        """Method used for ressources when compiled into EXE.
+
+        Args:
+            relative_path (str): The current relative path.
+
+        Returns:
+            str: The path to the ressource.
+        """
         try:
             base_path = sys._MEIPASS
         except Exception:
@@ -165,6 +175,16 @@ class Interface:
         return os.path.join(base_path, relative_path)
 
     def __center_window(self, master, width=300, height=200):
+        """Method to center the current window on screen.
+
+        Args:
+            master (tk.Toplevel): The current master.
+            width (int, optional): The current width. Defaults to 300.
+            height (int, optional): The current height. Defaults to 200.
+
+        Returns:
+            str: calculated screen coordinates for centering the window.
+        """
         # get screen width and height
         screen_width = master.winfo_screenwidth()
         screen_height = master.winfo_screenheight()
@@ -175,6 +195,16 @@ class Interface:
         return "%dx%d+%d+%d" % (width, height, x, y)
 
     def __createToplevel(self, height=200, width=300, title="") -> tk.Toplevel:
+        """Method to create a toplevel window.
+
+        Args:
+            height (int, optional): The needed height. Defaults to 200.
+            width (int, optional): The needed width. Defaults to 300.
+            title (str, optional): The needed title. Defaults to "".
+
+        Returns:
+            tk.Toplevel: The created toplevel
+        """
         top = tk.Toplevel(self.mainframe)
         top.geometry(self.__center_window(self.masterframe, height=height, width=width))
         top.minsize(width=width, height=height)
@@ -201,7 +231,15 @@ class Interface:
         top.grab_set()
         return top
 
-    def __findDBPath(self, basepath=False):
+    def __findDBPath(self, basepath: str = False):
+        """Method to find the current data source.
+
+        Args:
+            basepath (bool, optional): Path where to start the file explorer. Defaults to False.
+
+        Returns:
+            str: The path to the data source.
+        """
         top = self.__createToplevel(150, 300, title="Optionen")
 
         label = ttk.Label(
@@ -255,12 +293,14 @@ class Interface:
         self.config.set("optimizer_backend", "dbpath", "")
         self.config.set("optimizer_backend", "overlapThreshhold", "0.5")
         self.config.add_section("model_training")
-        self.config.set("model_training", "trainingSamples", "13")
+        self.config.set("model_training", "trainingSamples", "24")
         self.config.set("model_training", "trainingEpisodes", "500")
-        self.config.set("model_training", "batch_size", "16")
-        self.config.set("model_training", "gamma", "0.7")
+        self.config.set("model_training", "batch_size", "24")
+        self.config.set("model_training", "gamma", "0.64")
 
-    def __call__(self, *args: any, **kwds: any) -> None:
+    def __call__(
+        self,
+    ) -> None:
         """Call this to initate the window."""
         self.mainframe.mainloop()
 
@@ -268,7 +308,7 @@ class Interface:
         """Call this to initate the window."""
         self.mainframe.mainloop()
 
-    def __onClose(self, *args: any, **kwargs: any) -> None:
+    def __onClose(self) -> None:
         """Closing Operation. Saves config variables to file."""
         if self.__askQuestion(
             "",
@@ -291,15 +331,12 @@ class Interface:
         """
         threading.Thread(target=function).start()
 
-    def __dummy(self, text="") -> None:
-        """Dummy function. Used for testing.
-
-        Args:
-            text (str, optional): Optional Textstring. Defaults to "".
-        """
-        print("this is a test")
-
     def __optimize(self):
+        """Method to start the optimisation process.
+
+        Returns:
+            None: None
+        """
         self.text.config(state=NORMAL)
         self.text.delete(1.0, tk.END)
 
@@ -350,7 +387,7 @@ class Interface:
             running_value, running_solution = runmodel.getBestOder(
                 sampleReqs=sampleReqs,
                 samples=samples,
-                plot=True,
+                debug=False,
                 numCarts=self.config.getint("default", "numCarts"),
                 modelFolder=pathDir,
             )
@@ -372,6 +409,7 @@ class Interface:
         return
 
     def __trainModel(self):
+        """Method to train the modell."""
         if self.__askQuestion(
             "Training starten?",
             "Möchten Sie wirklich ein neues Training starten?\nDies kann mehrere Stunden dauern.",
@@ -387,13 +425,21 @@ class Interface:
                 dbpath=self.config.get("optimizer_backend", "dbpath"),
                 numSamples=self.config.getint("model_training", "trainingSamples"),
                 caching=self.config.getboolean("default", "useCache"),
+                overwriteDevice="cpu",
             )
-            EMBEDDING_DIMENSIONS = 10
+            EMBEDDING_DIMENSIONS = 28
             EMBEDDING_ITERATIONS_T = 2
+            optim_args = {
+                "weight_decay": 0.042270035169263205,
+                "eps": 0.2832233236834357,
+            }
             Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
                 EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS,
                 EMBEDDING_ITERATIONS_T=EMBEDDING_ITERATIONS_T,
+                INIT_LR=0.0036528384837269156,
                 OPTIMIZER=torch.optim.Adam,
+                loss_func=torch.nn.HuberLoss,
+                optim_args=optim_args,
             )
             runmodel.fit(
                 Q_func=Q_Function,
@@ -401,22 +447,27 @@ class Interface:
                 optimizer=Adam,
                 lr_scheduler=ExponentialLR,
                 NR_EPISODES=self.config.getint("model_training", "trainingEpisodes"),
-                MIN_EPSILON=0.7,
-                EPSILON_DECAY_RATE=6e-4,
+                MIN_EPSILON=0.731744464273397,
+                EPSILON_DECAY_RATE=0.44184466917502785,
                 N_STEP_QL=4,
                 BATCH_SIZE=self.config.getint("model_training", "batch_size"),
                 GAMMA=self.config.getfloat("model_training", "gamma"),
+                debug=True,
             )
         else:
             return
 
     def __askQuestion(self, title, message, height=200, width=300) -> None:
-        """Create a menu in the menubar.
+        """Method to create a check window.
 
         Args:
-            menubar (tk.Menu): The current MenuBar instance.
-            label (str): The Label of the menu.
-            data (dict): Options in the menu.
+            title (_type_): The title to be displayed.
+            message (str): The message to display.
+            height (int, optional): The needed height. Defaults to 200.
+            width (int, optional): The needed width. Defaults to 300.
+
+        Returns:
+            bool: The answer to the question.
         """
         messageList = message.split("\n")
         maxlen = max([len(x) for x in messageList]) * 12
@@ -545,11 +596,13 @@ class Interface:
             posX (int): The X Grid Position.
             posY (int): The Y Grid Position.
             text (str): The display text.
-            function (FunctionType): The function to be called on button press.
-            margin (int, optional): Margin to next element in Grid. Defaults to None.
+            master (tk.Frame): The current master.
+            function (FunctionType): The function to activate.
+            margin (int, optional): Margin for X. Defaults to None.
+            marginy (int, optional): Margin for Y. Defaults to 0.
 
         Returns:
-            tk.Button: The created Button.
+            tk.Button: The created button.
         """
         if margin == None:
             margin = 30
@@ -619,7 +672,7 @@ class Interface:
         self.__createButton(
             8,
             1,
-            text="Model trainieren",
+            text="Modell trainieren",
             master=self.formbar,
             function=self.__trainModel,
             margin=50,
@@ -651,7 +704,8 @@ class Interface:
         ttk.Button(top, text="OK", command=lambda: getDate(cal)).pack()
 
     def __showTrainingOptions(self):
-        toplevel = self.__createToplevel(height=500, title="Erweitert")
+        """Shows the available training options."""
+        toplevel = self.__createToplevel(height=300, title="Erweitert")
         top = ttk.Frame(toplevel)
         top.pack(side="top", expand=1, fill="both")
 
@@ -662,14 +716,9 @@ class Interface:
             self.config.set(
                 "model_training", "trainingEpisodes", str(trainingEpisodes.get())
             )
-            self.config.set("model_training", "batch_size", str(batch_size.get()))
-            gammaFixed = gamma.get().replace(",", ".")
-            self.config.set("model_training", "gamma", str(gammaFixed))
 
             info(f"Successfully set trainingSamples to {str(trainingSamples.get())}")
             info(f"Successfully set trainingEpisodes to {str(trainingEpisodes.get())}")
-            info(f"Successfully set batch_size to {str(batch_size.get())}")
-            info(f"Successfully set gamma to {str(gammaFixed)}")
 
             toplevel.grab_release()
             toplevel.withdraw()
@@ -685,20 +734,6 @@ class Interface:
         trainingEpisodes = tk.IntVar()
         trainingEpisodes.set(self.config.getint("model_training", "trainingEpisodes"))
         ttk.Entry(top, textvariable=trainingEpisodes).pack(pady=5)
-
-        ttk.Label(top, text="Batch größe").pack(pady=5)
-        ttk.Label(top, text="Muss eine Ganzzahl sein.", font=("", 10, "italic")).pack()
-        batch_size = tk.IntVar()
-        batch_size.set(self.config.getint("model_training", "batch_size"))
-        ttk.Entry(top, textvariable=batch_size).pack(pady=5)
-
-        ttk.Label(top, text="Größe für gamma").pack(pady=5)
-        ttk.Label(
-            top, text="Muss eine Dezimalzahl unter 1 sein.", font=("", 10, "italic")
-        ).pack()
-        gamma = tk.StringVar()
-        gamma.set(self.config.getfloat("model_training", "gamma"))
-        ttk.Entry(top, textvariable=gamma).pack(pady=5)
 
         ttk.Button(top, text="OK", command=callback).pack(pady=5)
 

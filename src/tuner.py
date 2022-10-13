@@ -13,7 +13,10 @@ import numpy as np
 
 PATH = Path(os.getcwd() + os.path.normpath("/data/models"))
 
-from main import RunModel
+try:
+    from main import RunModel
+except:
+    from src.main import RunModel
 
 
 class Tuner:
@@ -21,15 +24,11 @@ class Tuner:
         self,
         direction: Literal["minimize", "maximize"] = "maximize",
         sampler: optuna.samplers = optuna.samplers.TPESampler,
-        pruner: optuna.pruners = optuna.pruners.PercentilePruner,
     ) -> optuna.study:
         """Class to initiate a Model tuning session.
         Args:
-            dataPath (Path): Path to a data source. May change to DB connection
-            epochs (int): Number of epochs in each Trial run
             direction (Literal[&quot;minimize&quot;, &quot;maximize&quot;], optional): Direction to optimize. &quot;minimize&quot; optimizes Loss,  &quot;maximize&quot; optimizes Accuracy. Defaults to "maximize".
             sampler (optuna.samplers, optional): Optuna Sampler Algorythm to use. Defaults to optuna.samplers.TPESampler.
-            pruner (optuna.pruners, optional): Optuna Pruner Algorythm to use. Defaults to optuna.pruners.HyperbandPruner.
         Returns:
             optuna.study: Optuna Study like session.
         """
@@ -124,14 +123,9 @@ class Tuner:
             print("Starting Trial: ", trial.number)
         params["loss_function"] = getattr(nn, params["loss_function"])
 
-        # random.seed(1000)
-        # np.random.seed(1000)
-        # torch.manual_seed(1000)
-
         optim_args = {
             "weight_decay": params["weight_decay"],
             "eps": params["momentum"],
-            "dampening": params["momentum"],
         }
 
         runmodel = RunModel(
@@ -145,6 +139,7 @@ class Tuner:
                 # fname=os.path.join(runmodel.folder_name, shortest_fname),
                 EMBEDDING_DIMENSIONS=params["embed_dimensions"],
                 EMBEDDING_ITERATIONS_T=params["embed_iterations"],
+                INIT_LR=params["learning_rate"],
                 OPTIMIZER=getattr(torch.optim, params["optimizer"]),
                 optim_args=optim_args,
                 loss_func=params["loss_function"],
@@ -154,6 +149,7 @@ class Tuner:
                 # fname=os.path.join(runmodel.folder_name, shortest_fname),
                 EMBEDDING_DIMENSIONS=params["embed_dimensions"],
                 EMBEDDING_ITERATIONS_T=params["embed_iterations"],
+                INIT_LR=params["learning_rate"],
                 OPTIMIZER=getattr(torch.optim, params["optimizer"]),
                 loss_func=params["loss_function"],
             )

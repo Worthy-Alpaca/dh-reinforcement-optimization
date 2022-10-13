@@ -2,6 +2,7 @@ import math
 import random
 import torch
 import torch.nn as nn
+from types import FunctionType
 
 
 class QFunction:
@@ -9,22 +10,49 @@ class QFunction:
         self,
         model: nn.Module,
         optimizer: torch.optim,
-        lr_scheduler,
+        lr_scheduler: FunctionType,
         loss_fn: torch.nn = nn.HuberLoss,
         device=torch.device("cpu"),
     ) -> None:
+        """Initiate the Q Function
+
+        Args:
+            model (nn.Module): The current model instance.
+            optimizer (torch.optim): The current optimizer instance.
+            lr_scheduler (FunctionType): The current learning rate scheduler
+            loss_fn (torch.nn, optional): The current loss function. Defaults to nn.HuberLoss.
+            device (torch.device or str, optional): The current device. Defaults to torch.device("cpu").
+        """
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
         self.loss_fn = loss_fn()
         self.device = device
 
-    def predict(self, state_tsr, W):
+    def predict(self, state_tsr: torch.tensor, W: torch.tensor):
+        """Method to predict a reward.
+
+        Args:
+            state_tsr (torch.tensor): The current state tensor.
+            W (torch.tensor): The current distance matrix tensor.
+
+        Returns:
+            torch.tensor: The predicted rewards tensor.
+        """
         with torch.no_grad():
             estimated_rewards = self.model(state_tsr.unsqueeze(0), W.unsqueeze(0))
         return estimated_rewards[0]
 
     def get_best_action(self, state_tsr, state):
+        """Method to get the current best action.
+
+        Args:
+            state_tsr (torch.tensor): The current state tensor.
+            state (State): The current state.
+
+        Returns:
+            tuple: index and estimated reward of best action.
+        """
         W = state.W
 
         estimated_rewards = self.predict(state_tsr, W)  # size (nr_nodes,)
@@ -42,6 +70,17 @@ class QFunction:
         return 0, 0
 
     def batch_update(self, states_tsrs, Ws, actions, targets):
+        """Method to calculate the batch loss.
+
+        Args:
+            states_tsrs (torch.tensor): The current state tensor.
+            Ws (torch.tensor): The current distance matrix tensor.
+            actions (torch.tensor): The current batch actions.
+            targets (torch.tensor): The current batch targets.
+
+        Returns:
+            float: The calculated batch loss.
+        """
         Ws_tsr = torch.stack(Ws).to(self.device)
         xv = torch.stack(states_tsrs).to(self.device)
         self.optimizer.zero_grad(set_to_none=True)
@@ -72,12 +111,22 @@ class QFunction:
 
 class Memory(object):
     def __init__(self, capacity=10000) -> None:
+        """Class that represents a memory.
+
+        Args:
+            capacity (int, optional): The memory capacity. Defaults to 10000.
+        """
         self.capacity = capacity
         self.memory = []
         self.position = 0
         self.nr_inserts = 0
 
     def remember(self, experience):
+        """Method to remember the current experience
+
+        Args:
+            experience (torch.tensor): The current experience.
+        """
         if len(self.memory) < self.capacity:
             self.memory.append(None)
 
@@ -86,6 +135,14 @@ class Memory(object):
         self.nr_inserts += 1
 
     def sample_batch(self, batch_size):
+        """Method to return a sample batch.
+
+        Args:
+            batch_size (int): The needed batch size.
+
+        Returns:
+            torch.tensor: The created batch.
+        """
         return random.sample(self.memory, batch_size)
 
     def __len__(self):
@@ -94,6 +151,11 @@ class Memory(object):
 
 class UtilFunctions:
     def __init__(self, coords) -> None:
+        """Initiate the utility function collection.
+
+        Args:
+            coords (torch.tensor): The current components.
+        """
         self.coords = coords
 
     def is_state_final(self, state):
@@ -123,6 +185,15 @@ class UtilFunctions:
         return total_overlap, t1
 
     def total_distance(self, solution: list, W):
+        """Method to calculate the total distance of a given solution.
+
+        Args:
+            solution (list): The current solution.
+            W (torch.tensor): The current distance matrix tensor.
+
+        Returns:
+            tuple: calculated distance, solution
+        """
         if len(solution) < 2:
             return 0, solution
 
@@ -151,7 +222,14 @@ class UtilFunctions:
         return total_dist, solution
 
     def get_next_neighbor_random(self, state):
-        # replace this with overlap calculations
+        """Method to get a random action for a given state (explore).
+
+        Args:
+            state (State): The current state.
+
+        Returns:
+            int: The random index of a all available nodes.
+        """
         solution, W = state.partial_solution, state.W
 
         if len(solution) == 0:
@@ -167,6 +245,14 @@ class UtilFunctions:
 
 
 def Cartsetup(comps: list):
+    """Function to calculate setup time for a given list of components.
+
+    Args:
+        comps (list): The current component list.
+
+    Returns:
+        float: The calculated time.
+    """
     time = 0
 
     complexity = 36 / len(comps)
@@ -176,7 +262,10 @@ def Cartsetup(comps: list):
 
 
 def Coating(Ymax) -> float:
-    """simulates the time for coating a PCB
+    """simulates the time for coating a PCB.
+
+    Args:
+        Ymax (int): The maximum y value on a given PCB.
 
     Returns:
         float: The calculated time.
@@ -189,10 +278,21 @@ def Coating(Ymax) -> float:
 
 class TextRedirector(object):
     def __init__(self, widget, tag="stdout"):
+        """Class to redirect a console interaction to a given TKinter widget.
+
+        Args:
+            widget (tk.widget): The widget which should display the console interaction
+            tag (str, optional): The given tag. Defaults to "stdout".
+        """
         self.widget = widget
         self.tag = tag
 
     def write(self, str):
+        """Method to write to the widget.
+
+        Args:
+            str (str): The string to be displayed.
+        """
         self.widget.configure(state="normal")
         self.widget.insert("end", str, (self.tag,))
         self.widget.see("end")

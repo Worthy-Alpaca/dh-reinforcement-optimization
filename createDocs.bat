@@ -1,0 +1,1 @@
+pdoc .\src\ --docformat google --output-dir docs

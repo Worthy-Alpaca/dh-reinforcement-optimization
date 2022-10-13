@@ -4,7 +4,16 @@ import torch.nn.functional as F
 
 
 class QNetModel(nn.Module):
-    def __init__(self, emb_dim, emb_it=4, device=torch.device("cpu")) -> None:
+    def __init__(
+        self, emb_dim: int, emb_it: int = 4, device=torch.device("cpu")
+    ) -> None:
+        """Creates a child of nn.Module as the neural network.
+
+        Args:
+            emb_dim (int): Number of embedding dimensions.
+            emb_it (int, optional): Number of embedding iterations. Defaults to 4.
+            device (torch.device or str, optional): The device on which to initiate tensors and layers. Defaults to torch.device("cpu").
+        """
         super(QNetModel, self).__init__()
         self.emb_dim = emb_dim
         self.emb_it = 1
@@ -28,8 +37,16 @@ class QNetModel(nn.Module):
             for _ in range(nr_extra_layers_1)
         ]
 
-    def forward(self, xv, Ws):
+    def forward(self, xv: torch.tensor, Ws: torch.tensor):
+        """Forward pass of the neural network.
 
+        Args:
+            xv (torch.tensor): The current Q Table.
+            Ws (torch.tensor): Distance Matrix for all Nodes.
+
+        Returns:
+            torch.tensor: The calculated distances for all other nodes.
+        """
         num_nodes = xv.shape[1]
         batch_size = xv.shape[0]
 

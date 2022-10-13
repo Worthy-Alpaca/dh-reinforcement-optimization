@@ -8,6 +8,12 @@ from sqlalchemy import engine
 
 class DataBaseLoader:
     def __init__(self, pathToProductTxT: Path, refEngine: engine = None) -> None:
+        """Class to load data from a txt file.
+
+        Args:
+            pathToProductTxT (Path): The path to the data source.
+            refEngine (engine, optional): SQL Engine for reference data. Defaults to None.
+        """
         file = open(pathToProductTxT, "r")
         self.refEngine = refEngine
 
@@ -64,7 +70,15 @@ class DataBaseLoader:
         self.compData = values["Component"].tolist()
         self.occuranceData = values
 
-    def __call__(self, product):
+    def __call__(self, product: str):
+        """Method to generate all needed data by a given product ID.
+
+        Args:
+            product (str): The current product ID.
+
+        Returns:
+            tuple: Placements amount, component list, offset list, score
+        """
         productData = self.products[product]
         components = productData.to_numpy()
         components = components[~pd.isnull(components)]
@@ -86,7 +100,15 @@ class DataBaseLoader:
                     offsets = 1
         return (self.refDB[product], components, offsets, score)
 
-    def getProductData(self, product):
+    def getProductData(self, product: str):
+        """Method to retrieve only the components for a given product ID.
+
+        Args:
+            product (str): The current product ID.
+
+        Returns:
+            np.ndarray: The retrieved components.
+        """
         productData = self.products[product]
         components = productData.to_numpy()
         components = components[~pd.isnull(components)]
@@ -97,6 +119,14 @@ class KappaLoader:
     def __init__(
         self, path: Path, dbpath: str, startDate: str = None, endDate: str = None
     ) -> None:
+        """Class to load all needed data from an exported SAP excel list.
+
+        Args:
+            path (Path): Path to the excel spreadsheet.
+            dbpath (str): Path to the data source.
+            startDate (str, optional): The given start date. Defaults to None.
+            endDate (str, optional): The given end date. Defaults to None.
+        """
         data = pd.read_excel(path)
 
         data = data[["Unnamed: 3", "Material", "VerursMenge", "Kurztext"]]
@@ -115,6 +145,11 @@ class KappaLoader:
         return self.getData()
 
     def getData(self):
+        """Method to return all needed data.
+
+        Returns:
+            tuple: Sample list, requirements list, short text array.
+        """
         rmData = self.data[~self.data["Material"].isin(self.referenceData)][
             "Material"
         ].tolist()

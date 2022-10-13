@@ -1,93 +1,93 @@
 {
- "version": "auto-py-to-exe-configuration_v1",
- "pyinstallerOptions": [
-  {
-   "optionDest": "noconfirm",
-   "value": true
-  },
-  {
-   "optionDest": "filenames",
-   "value": "C:/Users/stephan.schumacher/Documents/repos/dh-reinforcement-optimization/src/interface.py"
-  },
-  {
-   "optionDest": "onefile",
-   "value": false
-  },
-  {
-   "optionDest": "console",
-   "value": false
-  },
-  {
-   "optionDest": "icon_file",
-   "value": "C:/Users/stephan.schumacher/Documents/repos/dh-reinforcement-optimization/src/assets/logo.ico"
-  },
-  {
-   "optionDest": "name",
-   "value": "D+H Optimizer"
-  },
-  {
-   "optionDest": "ascii",
-   "value": false
-  },
-  {
-   "optionDest": "clean_build",
-   "value": false
-  },
-  {
-   "optionDest": "strip",
-   "value": false
-  },
-  {
-   "optionDest": "noupx",
-   "value": false
-  },
-  {
-   "optionDest": "disable_windowed_traceback",
-   "value": false
-  },
-  {
-   "optionDest": "embed_manifest",
-   "value": true
-  },
-  {
-   "optionDest": "uac_admin",
-   "value": false
-  },
-  {
-   "optionDest": "uac_uiaccess",
-   "value": false
-  },
-  {
-   "optionDest": "win_private_assemblies",
-   "value": false
-  },
-  {
-   "optionDest": "win_no_prefer_redirects",
-   "value": false
-  },
-  {
-   "optionDest": "bootloader_ignore_signals",
-   "value": false
-  },
-  {
-   "optionDest": "argv_emulation",
-   "value": false
-  },
-  {
-   "optionDest": "datas",
-   "value": "C:/Users/stephan.schumacher/Documents/repos/dh-reinforcement-optimization/models;bin/assets/models"
-  },
-  {
-   "optionDest": "datas",
-   "value": "C:/Users/stephan.schumacher/Documents/repos/dh-reinforcement-optimization/FINAL MODEL;bin/assets/final model"
-  },
-  {
-   "optionDest": "datas",
-   "value": "C:/Users/stephan.schumacher/Documents/repos/dh-reinforcement-optimization/src/assets;bin/assets"
-  }
- ],
- "nonPyinstallerOptions": {
-  "increaseRecursionLimit": true,
-  "manualArguments": ""
- }
+    "version": "auto-py-to-exe-configuration_v1",
+    "pyinstallerOptions": [
+        {
+            "optionDest": "noconfirm",
+            "value": true
+        },
+        {
+            "optionDest": "filenames",
+            "value": "{your directory here}dh-reinforcement-optimization/src/interface.py"
+        },
+        {
+            "optionDest": "onefile",
+            "value": false
+        },
+        {
+            "optionDest": "console",
+            "value": false
+        },
+        {
+            "optionDest": "icon_file",
+            "value": "{your directory here}dh-reinforcement-optimization/src/assets/logo.ico"
+        },
+        {
+            "optionDest": "name",
+            "value": "D+H Optimizer"
+        },
+        {
+            "optionDest": "ascii",
+            "value": false
+        },
+        {
+            "optionDest": "clean_build",
+            "value": false
+        },
+        {
+            "optionDest": "strip",
+            "value": false
+        },
+        {
+            "optionDest": "noupx",
+            "value": false
+        },
+        {
+            "optionDest": "disable_windowed_traceback",
+            "value": false
+        },
+        {
+            "optionDest": "embed_manifest",
+            "value": true
+        },
+        {
+            "optionDest": "uac_admin",
+            "value": false
+        },
+        {
+            "optionDest": "uac_uiaccess",
+            "value": false
+        },
+        {
+            "optionDest": "win_private_assemblies",
+            "value": false
+        },
+        {
+            "optionDest": "win_no_prefer_redirects",
+            "value": false
+        },
+        {
+            "optionDest": "bootloader_ignore_signals",
+            "value": false
+        },
+        {
+            "optionDest": "argv_emulation",
+            "value": false
+        },
+        {
+            "optionDest": "datas",
+            "value": "{your directory here}dh-reinforcement-optimization/models;bin/assets/models"
+        },
+        {
+            "optionDest": "datas",
+            "value": "{your directory here}dh-reinforcement-optimization/FINAL MODEL;bin/assets/final model"
+        },
+        {
+            "optionDest": "datas",
+            "value": "{your directory here}dh-reinforcement-optimization/src/assets;bin/assets"
+        }
+    ],
+    "nonPyinstallerOptions": {
+        "increaseRecursionLimit": true,
+        "manualArguments": ""
+    }
 }

@@ -1,16 +1,17 @@
 import numpy as np
 import tkinter as tk
-from helper import UtilFunctions
 from logging import info
 from matplotlib.pyplot import style
 from sqlalchemy import engine
 
 
 try:
-    from src.modules.gui.parent.canvas import MyCanvas
+    from src.helper import UtilFunctions
+    from src.modules.parent.canvas import MyCanvas
     from src.misc.dataloader import DataBaseLoader
 except:
-    from modules.gui.parent.canvas import MyCanvas
+    from helper import UtilFunctions
+    from modules.parent.canvas import MyCanvas
     from misc.dataloader import DataBaseLoader
 
 
@@ -32,15 +33,17 @@ class Controller(MyCanvas):
         overlapThreshhold: float = 0.5,
         textSeparator: str = "",
     ) -> None:
-        """Creates the summary with the provided data.
+        """Displays the solution.
 
         Args:
-            coords (dict): PCB Coordinates for plotting.
-            mTime (dict): Time from assembly calculations.
-            sTime (dict): Time from setup calculations.
-            numParts (int): Number of created PCBs.
-            randomInterupt (tuple, optional): The random interrupt values. (Min, Max). Defaults to (0, 0).
-            prodName (str, optional): The Product name. Defaults to "".
+            best_value (float): The current best value.
+            best_solution (dict): Dict containing all values needed for calculations.
+            samples (list): Current sample list.
+            dbpath (str): Path to data source.
+            refEngine (engine): SQL Engine for reference data.
+            calcGroups (bool, optional): If group calculations should be performed. Defaults to False.
+            overlapThreshhold (float, optional): The current overlap threshhold for group calculations. Defaults to 0.5.
+            textSeparator (str, optional): The current text seperator for solution displaying. Defaults to "".
         """
         self.figure.clear()
         self.textSeparator = textSeparator
@@ -63,19 +66,25 @@ class Controller(MyCanvas):
             self.coords,
             self.solution,
             samples,
-            validate=self.validate,
+            calcGroups=self.validate,
         )
         self.canvas.draw()
         return
 
     def __plot_solution(
-        self, coords: np.ndarray, solution: list, shortText: np.ndarray, validate=False
+        self,
+        coords: np.ndarray,
+        solution: list,
+        shortText: np.ndarray,
+        calcGroups=False,
     ):
         """Method to plot the given coordinates according to the give solution.
 
         Args:
             coords (np.ndarray): The current coordinate set.
             solution (list): The calculated solution.
+            shortText (np.ndarray): The current products and short text descriptions.
+            validate (bool, optional): If group calculation should be performed. Defaults to False.
         """
 
         self.figure.clear()
@@ -92,14 +101,14 @@ class Controller(MyCanvas):
 
         t = 0
         l = len(solutionListOG)
-        if not validate:
+        if not calcGroups:
             solutionList = self.__calcGroups(solutionListOG)
             t = l - len(solutionList)
             t = t * 20
         else:
             solutionList = []
         textstr = ""
-        if not validate:
+        if not calcGroups:
             textShortStr = (
                 f"{len(solutionList)} Gruppen\n{t} Minuten durch Gruppierung gespart\n"
             )
@@ -148,6 +157,8 @@ class Controller(MyCanvas):
         )
 
         info(f"Calculated the best solution:\n{textstr}")
+
+        """ This is used to display the graphical solution on the left plot. """
 
         # for idx in range(n - 1):
         #     i, next_i = solution[idx], solution[idx + 1]
@@ -211,7 +222,14 @@ class Controller(MyCanvas):
         return
 
     def wait(self, message: str = "") -> any:
-        """Function that displays a loading screen."""
+        """Function that displays a loading screen.
+
+        Args:
+            message (str, optional): The message to be displayed along side the loading screen. Defaults to "".
+
+        Returns:
+            any: _description_
+        """
         self.figure.clear()
         waitPlot = self.figure.add_subplot(111)
 
