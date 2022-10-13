@@ -21,15 +21,11 @@ class Tuner:
         self,
         direction: Literal["minimize", "maximize"] = "maximize",
         sampler: optuna.samplers = optuna.samplers.TPESampler,
-        pruner: optuna.pruners = optuna.pruners.PercentilePruner,
     ) -> optuna.study:
         """Class to initiate a Model tuning session.
         Args:
-            dataPath (Path): Path to a data source. May change to DB connection
-            epochs (int): Number of epochs in each Trial run
             direction (Literal[&quot;minimize&quot;, &quot;maximize&quot;], optional): Direction to optimize. &quot;minimize&quot; optimizes Loss,  &quot;maximize&quot; optimizes Accuracy. Defaults to "maximize".
             sampler (optuna.samplers, optional): Optuna Sampler Algorythm to use. Defaults to optuna.samplers.TPESampler.
-            pruner (optuna.pruners, optional): Optuna Pruner Algorythm to use. Defaults to optuna.pruners.HyperbandPruner.
         Returns:
             optuna.study: Optuna Study like session.
         """
@@ -123,10 +119,6 @@ class Tuner:
         if trial is not None:
             print("Starting Trial: ", trial.number)
         params["loss_function"] = getattr(nn, params["loss_function"])
-
-        # random.seed(1000)
-        # np.random.seed(1000)
-        # torch.manual_seed(1000)
 
         optim_args = {
             "weight_decay": params["weight_decay"],

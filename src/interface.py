@@ -157,6 +157,14 @@ class Interface:
             self.__findDBPath()
 
     def resource_path(self, relative_path):
+        """Method used for ressources when compiled into EXE.
+
+        Args:
+            relative_path (str): The current relative path.
+
+        Returns:
+            str: The path to the ressource.
+        """
         try:
             base_path = sys._MEIPASS
         except Exception:
@@ -165,6 +173,16 @@ class Interface:
         return os.path.join(base_path, relative_path)
 
     def __center_window(self, master, width=300, height=200):
+        """Method to center the current window on screen.
+
+        Args:
+            master (tk.Toplevel): The current master.
+            width (int, optional): The current width. Defaults to 300.
+            height (int, optional): The current height. Defaults to 200.
+
+        Returns:
+            str: calculated screen coordinates for centering the window.
+        """
         # get screen width and height
         screen_width = master.winfo_screenwidth()
         screen_height = master.winfo_screenheight()
@@ -175,6 +193,16 @@ class Interface:
         return "%dx%d+%d+%d" % (width, height, x, y)
 
     def __createToplevel(self, height=200, width=300, title="") -> tk.Toplevel:
+        """Method to create a toplevel window.
+
+        Args:
+            height (int, optional): The needed height. Defaults to 200.
+            width (int, optional): The needed width. Defaults to 300.
+            title (str, optional): The needed title. Defaults to "".
+
+        Returns:
+            tk.Toplevel: The created toplevel
+        """
         top = tk.Toplevel(self.mainframe)
         top.geometry(self.__center_window(self.masterframe, height=height, width=width))
         top.minsize(width=width, height=height)
@@ -201,7 +229,15 @@ class Interface:
         top.grab_set()
         return top
 
-    def __findDBPath(self, basepath=False):
+    def __findDBPath(self, basepath: str = False):
+        """Method to find the current data source.
+
+        Args:
+            basepath (bool, optional): Path where to start the file explorer. Defaults to False.
+
+        Returns:
+            str: The path to the data source.
+        """
         top = self.__createToplevel(150, 300, title="Optionen")
 
         label = ttk.Label(
@@ -260,7 +296,9 @@ class Interface:
         self.config.set("model_training", "batch_size", "24")
         self.config.set("model_training", "gamma", "0.64")
 
-    def __call__(self, *args: any, **kwds: any) -> None:
+    def __call__(
+        self,
+    ) -> None:
         """Call this to initate the window."""
         self.mainframe.mainloop()
 
@@ -268,7 +306,7 @@ class Interface:
         """Call this to initate the window."""
         self.mainframe.mainloop()
 
-    def __onClose(self, *args: any, **kwargs: any) -> None:
+    def __onClose(self) -> None:
         """Closing Operation. Saves config variables to file."""
         if self.__askQuestion(
             "",
@@ -291,15 +329,12 @@ class Interface:
         """
         threading.Thread(target=function).start()
 
-    def __dummy(self, text="") -> None:
-        """Dummy function. Used for testing.
-
-        Args:
-            text (str, optional): Optional Textstring. Defaults to "".
-        """
-        print("this is a test")
-
     def __optimize(self):
+        """Method to start the optimisation process.
+
+        Returns:
+            None: None
+        """
         self.text.config(state=NORMAL)
         self.text.delete(1.0, tk.END)
 
@@ -372,6 +407,7 @@ class Interface:
         return
 
     def __trainModel(self):
+        """Method to train the modell."""
         if self.__askQuestion(
             "Training starten?",
             "Möchten Sie wirklich ein neues Training starten?\nDies kann mehrere Stunden dauern.",
@@ -420,12 +456,16 @@ class Interface:
             return
 
     def __askQuestion(self, title, message, height=200, width=300) -> None:
-        """Create a menu in the menubar.
+        """Method to create a check window.
 
         Args:
-            menubar (tk.Menu): The current MenuBar instance.
-            label (str): The Label of the menu.
-            data (dict): Options in the menu.
+            title (_type_): The title to be displayed.
+            message (str): The message to display.
+            height (int, optional): The needed height. Defaults to 200.
+            width (int, optional): The needed width. Defaults to 300.
+
+        Returns:
+            bool: The answer to the question.
         """
         messageList = message.split("\n")
         maxlen = max([len(x) for x in messageList]) * 12
@@ -554,11 +594,13 @@ class Interface:
             posX (int): The X Grid Position.
             posY (int): The Y Grid Position.
             text (str): The display text.
-            function (FunctionType): The function to be called on button press.
-            margin (int, optional): Margin to next element in Grid. Defaults to None.
+            master (tk.Frame): The current master.
+            function (FunctionType): The function to activate.
+            margin (int, optional): Margin for X. Defaults to None.
+            marginy (int, optional): Margin for Y. Defaults to 0.
 
         Returns:
-            tk.Button: The created Button.
+            tk.Button: The created button.
         """
         if margin == None:
             margin = 30
@@ -660,6 +702,7 @@ class Interface:
         ttk.Button(top, text="OK", command=lambda: getDate(cal)).pack()
 
     def __showTrainingOptions(self):
+        """Shows the available training options."""
         toplevel = self.__createToplevel(height=300, title="Erweitert")
         top = ttk.Frame(toplevel)
         top.pack(side="top", expand=1, fill="both")

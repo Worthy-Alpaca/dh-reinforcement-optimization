@@ -12,12 +12,21 @@ except:
 class Validate:
     def __init__(
         self,
-        best_value,
-        best_solution,
+        best_value: float,
+        best_solution: list,
         dbpath: str,
         calcGroups: bool = False,
         overlapThreshhold: float = 0.5,
     ) -> None:
+        """Class for visualising and comparing solutions.
+
+        Args:
+            best_value (float): Current best value by model.
+            best_solution (list): Current best solution by model.
+            dbpath (str): Path to database.
+            calcGroups (bool, optional): If groups should be calculated. Defaults to False.
+            overlapThreshhold (float, optional): Threshhold for group calculations. Defaults to 0.5.
+        """
         self.best_value = best_value
         self.overlapThreshhold = overlapThreshhold
         self.solution = best_solution["solution"]
@@ -33,6 +42,7 @@ class Validate:
         self.engine = create_engine(f"sqlite:///{dbpath}")
 
     def plotSoltions(self):
+        """Plot the current solution."""
         info(
             f"The best value for this iteration is: {self.best_value}",
         )

@@ -61,8 +61,17 @@ class RunModel:
         """Initiate the reinforcement learning model and training or prediction capabilities.
 
         Args:
-            numSamples (int, optional): The batch size for training iterations. Defaults to 10.
-            tuning (bool, optional): Whether the model is in training mode. Dictates if saved models will be deleted. Defaults to False.
+            dbpath (str): Path to current data source.
+            numSamples (int, optional): Number of samples to train with. Defaults to 10.
+            tuning (bool, optional): If the Model is running in tuning Mode. Deletes saved models in next tuning iteration. Defaults to False.
+            allowDuplicates (bool, optional): If duplicates should be allowed during training. Defaults to False.
+            overwriteDevice (_type_, optional): The device on which to initiate all torch instances. Defaults to False.
+            caching (bool, optional): If caching should be used. Defaults to True.
+            disableProgress (bool, optional): If the progress bar should be hidden. Defaults to False.
+            refEngine (engine, optional): SQL engine to reference data. Defaults to None.
+
+        Raises:
+            FileNotFoundError: If cached data can't be found.
         """
         if not overwriteDevice:
             if torch.cuda.is_available():
@@ -176,10 +185,13 @@ class RunModel:
             EMBEDDING_ITERATIONS_T (int, optional): Embedding iterations in the model. Defaults to 2.
             INIT_LR (float, optional): Initial learning rate. Changes over time. Defaults to 3e-3.
             OPTIMIZER (FunctionType, optional): The Optimizer to use. Defaults to torch.optim.Adam.
+            optim_args (dict, optional): Optional keyword arguments for optimizer instance. Defaults to {}.
+            loss_func (FunctionType, optional): The loss function to use. Defaults to torch.nn.MSELoss.
             LR_DECAY_RATE (float, optional): The decay rate of the initial learning rate. Defaults to 1.0-2e-5.
+            debug (bool, optional): If debug information should be displayed. Defaults to True.
 
         Returns:
-            tuple: Returns essential components of the training and prediction process: Q_func, Q_net, optimizer, lr_scheduler
+            tuple: Q Function, Q Networ, optimizer, learning rate scheduler
         """
         self.embedding_dimensions = EMBEDDING_DIMENSIONS
         self.embedding_iterations_t = EMBEDDING_ITERATIONS_T
@@ -253,86 +265,6 @@ class RunModel:
             fname,
         )
 
-    def plot_solution(self, coords: np.ndarray, solution: list, validate=False):
-        """Method to plot the given coordinates according to the give solution.
-
-        Args:
-            coords (np.ndarray): The current coordinate set.
-            solution (list): The calculated solution.
-        """
-
-        labels = coords[:, 3:4]
-        labels = labels[:, 0].tolist()
-
-        solutionList = []
-        for x in solution:
-            solutionList.append(coords[x][3:4][0])
-
-        if not validate:
-            solutionList = self.calcGroups(solutionList)
-        groupTimings = 0
-        textstr = f"{len(solutionList)} Groups\n"
-        testArr = []
-        for x in solutionList:
-            textstr += f"{x}\n"
-            runningArr = []
-            if not validate:
-                for i in x:
-                    runningArr.append(labels.index(i))
-                testArr.append(runningArr)
-
-        coords = coords[:, :3].astype(np.float32)
-        fig = plt.figure()
-        plot = fig.add_subplot(121, projection="3d")
-        ax = fig.add_subplot(122)
-        ax.axis("off")
-        plot.scatter(coords[:, 0], coords[:, 1], coords[:, 2])
-
-        n = len(coords)
-
-        ax.text(
-            0.05,
-            0.95,
-            textstr,
-            transform=ax.transAxes,
-            fontsize=14,
-            verticalalignment="top",
-            wrap=True,
-        )
-        for idx in range(n - 1):
-            i, next_i = solution[idx], solution[idx + 1]
-            plot.plot(
-                [coords[i, 0], coords[next_i, 0]],
-                [coords[i, 1], coords[next_i, 1]],
-                [coords[i, 2], coords[next_i, 2]],
-                "k",
-                lw=2,
-                alpha=0.8,
-            )
-
-        i, next_i = solution[-1], solution[0]
-        plot.plot(
-            [coords[i, 0], coords[next_i, 0]],
-            [coords[i, 1], coords[next_i, 1]],
-            [coords[i, 2], coords[next_i, 2]],
-            "k",
-            lw=2,
-            alpha=0.8,
-        )
-        plot.set(
-            xlabel="Number of placements",
-            ylabel="Number of Components",
-            zlabel="Cumulative Component Score",
-        )
-        plot.plot(
-            coords[solution[0], 0],
-            coords[solution[0], 1],
-            coords[solution[0], 2],
-            "x",
-            markersize=10,
-        )
-        return groupTimings
-
     def state2tens(self, state: NamedTuple) -> torch.tensor:
         """Method to convert a given state into PyTorch tensor.
 
@@ -387,6 +319,14 @@ class RunModel:
         return [list(allowed)[x] for x in listkeys]
 
     def get_duplicates(self, iterable: list):
+        """Method to retrieve duplicates in given iterable.
+
+        Args:
+            iterable (list): Iterable to be searched for duplicates
+
+        Returns:
+            tuple: found duplicates, their occurance
+        """
         proofingDict = {}
         for el in iterable:
             try:
@@ -401,14 +341,12 @@ class RunModel:
                 occurances.append(iterable.count(key))
         return duplicates, occurances
 
-    def getData(
-        self, key: bool = False, samples: list = False, sampleReqsList: list = False
-    ):
-        """Method to get a data sample.
+    def getData(self, samples: list = False, sampleReqsList: list = False):
+        """Method to generate a data sample from a given sample list.
 
         Args:
-            key (bool, optional): Returns the data for this key if given. Defaults to False.
-            samples (list, optional): Generates the data from the given list of samples. Defaults to False.
+            samples (list, optional): The current sample. Defaults to False.
+            sampleReqsList (list, optional): The current sample requirements. Defaults to False.
         """
 
         def compare(p1, p2):
@@ -494,17 +432,12 @@ class RunModel:
         )
         return coords, W_np, product
 
-    def get_graph_mat(self, n=10, size=1):
-        """Throws n nodes uniformly at random on a square, and build a (fully connected) graph.
-        Returns the (N, 2) coordinates matrix, and the (N, N) matrix containing pairwise euclidean distances.
-        """
-        coords = size * np.random.uniform(size=(n, 3))
-        dist_mat = distance_matrix(coords, coords)
-        return coords, dist_mat
+    def generateData(self):
+        """Method used to generate all needed training data.
 
-    def generateData(
-        self,
-    ):
+        Returns:
+            tuple: All datapoints as dict, their components
+        """
         sampleSize = list(self.products.keys())
         sampleReqs = np.random.randint(1, 70, size=(len(sampleSize))).tolist()
         currentDict = []
@@ -527,9 +460,6 @@ class RunModel:
                     if self.products[i]["score"] != 0
                     else 0,
                     i,
-                    # self.products[i]["comps"],
-                    # float(len(self.products[i]["comps"])),
-                    # req,
                 ]
             )
             del req, simTime, currentList
@@ -574,6 +504,10 @@ class RunModel:
             N_STEP_QL (int): Placeholder
             BATCH_SIZE (int): The current batch size.
             GAMMA (float): The current gamma value.
+            trial (optuna.trial.Trial): The current trial in tuning. Defaults to None.
+            debug (bool): If debug information should be displayed. Defaults to None.
+        Returns:
+            float: The median loss value for the training.
         """
         self.training = True
         self.losses = []
@@ -621,7 +555,6 @@ class RunModel:
             states_tsrs = [
                 current_state_tsr
             ]  # we also keep the state tensors here (for efficiency)
-            # rewards = torch.zeros(0, device=self.device)
             rewards = []
             actions = []
 
@@ -639,7 +572,7 @@ class RunModel:
                     nr_explores += 1
                 else:
                     # exploit
-                    next_node, est_reward = Q_func.get_best_action(
+                    next_node, _ = Q_func.get_best_action(
                         current_state_tsr, current_state
                     )
                 del current_state_tsr, current_state
@@ -776,7 +709,13 @@ class RunModel:
             np.convolve(np.array(self.losses), np.ones((100,)) / 100, mode="valid")
         )
 
-    def __createTensorboardLogs(self, model: nn.Module, epoch):
+    def __createTensorboardLogs(self, model: nn.Module, epoch: int):
+        """Create logs to be used in TensorBoard.
+
+        Args:
+            model (nn.Module): The current model.
+            epoch (int): The current epoch.
+        """
         for name, module in model.named_children():
             try:
                 self.writer.add_histogram(f"{name}.bias", module.bias, epoch)
@@ -798,11 +737,6 @@ class RunModel:
         plt.ylabel("loss")
         plt.xlabel("training iteration")
 
-        # plt.figure(figsize=(8, 5))
-        # plt.scatter(range(len(self.rewards)), self.rewards, "-o")
-        # plt.ylabel("Rewards")
-        # plt.xlabel("training iteration")
-
         plt.figure(figsize=(8, 5))
         plt.plot(_moving_avg(self.path_lengths, 100))
         plt.ylabel("average length")
@@ -812,22 +746,22 @@ class RunModel:
     def getBestOder(
         self,
         samples: list = False,
-        plot: bool = False,
+        debug: bool = False,
         numCarts: int = 6,
         sampleReqs: list = False,
         modelFolder: Path = "",
     ):
-        """Method to predict the best order of the given sample set
+        """Method to get the best order in a given sample list.
 
         Args:
-            samples (list): The current sample list
-            plot (bool, optional): If the prediction should be plotted. Defaults to False.
-            numCarts (int, optional): How many cartbays can be used alltogether. Defaults to 6.
-            validate (bool, optional): If the validation dataset should be used. Defaults to False.
-            sampleReqs (list, optional): The required production values for the validation set. Defaults to False.
+            samples (list, optional): The current sample list. Defaults to False.
+            debug (bool, optional): If debug information should be displayed. Defaults to False.
+            numCarts (int, optional): Number of carts to use for group calculations. Defaults to 6.
+            sampleReqs (list, optional): List of sample requirements. Defaults to False.
+            modelFolder (Path, optional): Path to the best saved model. Defaults to "".
 
         Returns:
-            tuple: The best value and the best solution.
+            tuple: The calculated best value and the calculted best solution dict.
         """
         self.numCarts = numCarts
         self.training = False
@@ -847,7 +781,7 @@ class RunModel:
             os.path.join(modelFolder, shortest_fname),
             EMBEDDING_DIMENSIONS=emb,
             EMBEDDING_ITERATIONS_T=it,
-            debug=plot,
+            debug=debug,
         )
         best_solution = {}
         best_value = float("inf")
@@ -903,23 +837,15 @@ class RunModel:
 
         return best_value, best_solution
 
-    def plot_graph(self, coords):
-        """Utility function to plot the fully connected graph"""
-        n = len(coords)
+    def resource_path(self, relative_path: str):
+        """Method used for ressources when compiled into EXE.
 
-        plt.scatter(coords[:, 0], coords[:, 1], s=[50 for _ in range(n)])
-        for i in range(n):
-            for j in range(n):
-                if j < i:
-                    plt.plot(
-                        [coords[i, 0], coords[j, 0]],
-                        [coords[i, 1], coords[j, 1]],
-                        "b",
-                        alpha=0.7,
-                    )
-        plt.show()
+        Args:
+            relative_path (str): The current relative path.
 
-    def resource_path(self, relative_path):
+        Returns:
+            str: The path to the ressource.
+        """
         try:
             base_path = sys._MEIPASS
         except Exception:
@@ -942,18 +868,6 @@ if __name__ == "__main__":
         tuning=False,
         allowDuplicates=False,
     )
-    # exit()
-    # runmodel.generateData()
-
-    # all_lengths_fnames = [
-    #     f for f in os.listdir(runmodel.folder_name) if f.endswith(".tar")
-    # ]
-    # shortest_fname = sorted(
-    #     all_lengths_fnames, key=lambda s: float(s.split(".tar")[0].split("_")[-1])
-    # )[0]
-    # fname = shortest_fname.split("_")
-    # emb = int(fname[fname.index("emb") + 1])
-    # it = int(fname[fname.index("it") + 1])
 
     Q_Function, QNet, Adam, ExponentialLR = runmodel.init_model(
         # fname=os.path.join(runmodel.folder_name, shortest_fname),
