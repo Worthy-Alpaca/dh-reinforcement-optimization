@@ -13,7 +13,10 @@ import numpy as np
 
 PATH = Path(os.getcwd() + os.path.normpath("/data/models"))
 
-from main import RunModel
+try:
+    from main import RunModel
+except:
+    from src.main import RunModel
 
 
 class Tuner:

@@ -24,16 +24,18 @@ SCRIPT_DIR = os.path.dirname(
 )
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
-from main import RunModel
-from helper import TextRedirector
-from misc.dataloader import KappaLoader
-
 try:
-    from src.modules.gui.controller.controller import Controller
-    from src.modules.gui.parent.menubar import Titlebar, Menubar, MenuCustom
+    from src.helper import TextRedirector
+    from src.main import RunModel
+    from src.misc.dataloader import KappaLoader
+    from src.modules.controller.controller import Controller
+    from src.modules.parent.menubar import Titlebar, Menubar, MenuCustom
 except:
-    from modules.gui.controller.controller import Controller
-    from modules.gui.parent.menubar import Titlebar, Menubar, MenuCustom
+    from helper import TextRedirector
+    from main import RunModel
+    from misc.dataloader import KappaLoader
+    from modules.controller.controller import Controller
+    from modules.parent.menubar import Titlebar, Menubar, MenuCustom
 
 
 class Interface:
@@ -385,7 +387,7 @@ class Interface:
             running_value, running_solution = runmodel.getBestOder(
                 sampleReqs=sampleReqs,
                 samples=samples,
-                plot=False,
+                debug=False,
                 numCarts=self.config.getint("default", "numCarts"),
                 modelFolder=pathDir,
             )

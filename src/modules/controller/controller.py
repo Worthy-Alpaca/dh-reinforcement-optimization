@@ -1,16 +1,17 @@
 import numpy as np
 import tkinter as tk
-from helper import UtilFunctions
 from logging import info
 from matplotlib.pyplot import style
 from sqlalchemy import engine
 
 
 try:
-    from src.modules.gui.parent.canvas import MyCanvas
+    from src.helper import UtilFunctions
+    from src.modules.parent.canvas import MyCanvas
     from src.misc.dataloader import DataBaseLoader
 except:
-    from modules.gui.parent.canvas import MyCanvas
+    from helper import UtilFunctions
+    from modules.parent.canvas import MyCanvas
     from misc.dataloader import DataBaseLoader
 
 
@@ -65,7 +66,7 @@ class Controller(MyCanvas):
             self.coords,
             self.solution,
             samples,
-            validate=self.validate,
+            calcGroups=self.validate,
         )
         self.canvas.draw()
         return
